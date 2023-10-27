@@ -18,7 +18,15 @@ namespace LibIRD
         /// "3IRD"
         /// </summary>
         /// 
-        protected static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
+        public static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
+
+        /// <summary>
+        /// AES encryption/decryption keys and initial values
+        /// </summary>
+        public static readonly byte[] D1AesKey = { 0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED };
+        public static readonly byte[] D1AesIV = { 0x69, 0x47, 0x47, 0x72, 0xAF, 0x6F, 0xDA, 0xB3, 0x42, 0x74, 0x3A, 0xEF, 0xAA, 0x18, 0x62, 0x87 };
+        public static readonly byte[] D2AesKey = { 0x7C, 0xDD, 0x0E, 0x02, 0x07, 0x6E, 0xFE, 0x45, 0x99, 0xB1, 0xB8, 0x2C, 0x35, 0x99, 0x19, 0xB3 };
+        public static readonly byte[] D2AesIV = { 0x22, 0x26, 0x92, 0x8D, 0x44, 0x03, 0x2F, 0x43, 0x6A, 0xFD, 0x26, 0x7E, 0x74, 0x8B, 0x23, 0x93 };
 
         #endregion
 
@@ -173,13 +181,36 @@ namespace LibIRD
         protected void GenerateD1(byte[] key)
         {
             // Validate key
-            if (key == null)
+            if (key == null || key.Length <= 0)
                 throw new ArgumentNullException(nameof(key));
             if (key.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
-            // TODO: AES decryption
-            Data1Key = key;
+            // AES decryption
+            using (Aes aes = Aes.Create())
+            {
+                // Validate aes is available
+                if (aes == null)
+                    throw new InvalidOperationException("AES not available. Change your system settings");
+
+                // Set AES settings
+                aes.Key = D1AesKey;
+                aes.IV = D1AesIV;
+                aes.Padding = PaddingMode.None;
+                aes.Mode = CipherMode.CBC;
+
+                // Perform AES decryption
+                using (ICryptoTransform decryptor = aes.CreateDecryptor())
+                {
+                    MemoryStream ms = new MemoryStream();
+                    CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Write);
+                    cs.Write(key, 0, 16);
+                    cs.FlushFinalBlock();
+                    Data1Key = ms.ToArray();
+                    ms.Close();
+                    cs.Close();
+                }
+            }
         }
 
         /// <summary>
@@ -191,13 +222,36 @@ namespace LibIRD
         protected void GenerateD2(byte[] id)
         {
             // Validate id
-            if (id == null)
+            if (id == null || id.Length <= 0)
                 throw new ArgumentNullException(nameof(id));
             if (id.Length != 16)
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
 
-            // TODO: AES encryption
-            Data2Key = id;
+            // AES encryption
+            using (Aes aes = Aes.Create())
+            {
+                // Validate aes is available
+                if (aes == null)
+                    throw new InvalidOperationException("AES not available. Change your system settings");
+
+                // Set AES settings
+                aes.Key = D2AesKey;
+                aes.IV = D2AesIV;
+                aes.Padding = PaddingMode.None;
+                aes.Mode = CipherMode.CBC;
+                
+                // Perform AES encryption
+                using (ICryptoTransform encryptor = aes.CreateEncryptor())
+                {
+                    MemoryStream ms = new MemoryStream();
+                    CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write);
+                    cs.Write(id, 0, 16);
+                    cs.FlushFinalBlock();
+                    Data2Key = ms.ToArray();
+                    ms.Close();
+                    cs.Close();
+                }
+            }
         }
 
         #endregion
