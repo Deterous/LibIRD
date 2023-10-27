@@ -21,6 +21,11 @@ namespace LibIRD
         public static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
 
         /// <summary>
+        /// MD5 hash of null
+        /// </summary>
+        public static readonly byte[] NullMD5 = new byte[] {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
+
+        /// <summary>
         /// AES encryption/decryption keys and initial values
         /// </summary>
         public static readonly byte[] D1AesKey = { 0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED };
@@ -382,8 +387,6 @@ namespace LibIRD
                 {
                     // Keep track of the little-endian 32-bit "IEEE 802.3" CRC value
                     Crc32 crcStream = new Crc32();
-                    // TODO: Run as an async Task?
-                    crcStream.Append(outStream);
 
                     // Write IRD data to stream in order
                     using (BinaryWriter bw = new BinaryWriter(outStream))
