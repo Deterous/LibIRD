@@ -179,7 +179,7 @@ namespace LibIRD
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
             // TODO: AES decryption
-            Data2Key = key;
+            Data1Key = key;
         }
 
         /// <summary>
