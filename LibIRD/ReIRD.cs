@@ -10,7 +10,7 @@ namespace LibIRD
     public enum Region
     {
         // Null region
-        NONE = 0,
+        NONE = 0x00,
 
         // Japan and Asia
         Asia = 0x01, // BLAS/BCAS serials
@@ -162,12 +162,16 @@ namespace LibIRD
         /// Generates the UID field
         /// </summary>
         /// <param name="crc32">Redump ISO CRC32 hash</param>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
         private void GenerateUID(byte[] crc32)
         {
             // Validate CRC32
-            if (crc32 == null || crc32.Length != 8)
+            if (crc32 == null)
+                throw new ArgumentNullException(nameof(crc32));
+            if (crc32.Length != 8)
                 throw new ArgumentException("CRC32 hash must be an byte array of length 8", nameof(crc32));
+
             // Redump ISO CRC32 hash is used as the Unique ID in the IRD
             UID = BitConverter.ToUInt32(crc32, 0);
         }

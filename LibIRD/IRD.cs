@@ -168,11 +168,14 @@ namespace LibIRD
         /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
         /// </summary>
         /// <param name="key">Byte array containing AES encrypted Disc Key</param>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
         protected void GenerateD1(byte[] key)
         {
             // Validate key
-            if (key == null || key.Length != 16)
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+            if (key.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
             // TODO: AES decryption
@@ -183,11 +186,14 @@ namespace LibIRD
         /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
         /// </summary>
         /// <param name="id">Byte array containing AES decrypted Disc ID</param>
+        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
         protected void GenerateD2(byte[] id)
         {
             // Validate id
-            if (id == null || id.Length != 16)
+            if (id == null)
+                throw new ArgumentNullException(nameof(id));
+            if (id.Length != 16)
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
 
             // TODO: AES encryption
