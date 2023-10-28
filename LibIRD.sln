@@ -6,9 +6,8 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LibIRD", "LibIRD\LibIRD.csproj", "{4A80C34B-D4C5-4536-BEAE-46218BC09980}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BuildIRD", "BuildIRD\BuildIRD.csproj", "{A2FC2D93-1C3E-46E2-9D69-11F9DDA8CFC7}"
-	ProjectSection(ProjectDependencies) = postProject
-		{4A80C34B-D4C5-4536-BEAE-46218BC09980} = {4A80C34B-D4C5-4536-BEAE-46218BC09980}
-	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrintParams", "PrintParams\PrintParams.csproj", "{B5D9C0AD-EA8D-486E-A1D7-ED2C3C7163BC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,6 +23,10 @@ Global
 		{A2FC2D93-1C3E-46E2-9D69-11F9DDA8CFC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A2FC2D93-1C3E-46E2-9D69-11F9DDA8CFC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A2FC2D93-1C3E-46E2-9D69-11F9DDA8CFC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5D9C0AD-EA8D-486E-A1D7-ED2C3C7163BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5D9C0AD-EA8D-486E-A1D7-ED2C3C7163BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5D9C0AD-EA8D-486E-A1D7-ED2C3C7163BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5D9C0AD-EA8D-486E-A1D7-ED2C3C7163BC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

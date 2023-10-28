@@ -3,7 +3,7 @@ using System;
 
 namespace BuildIRD
 {
-    internal class BuildIRD
+    internal class Program
     {
         static void Main()
         {
@@ -11,7 +11,7 @@ namespace BuildIRD
             byte[] discID = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             byte[] discPIC = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             IRD ird = new IRD("Z:", discKey, discID, discPIC);
-            ird.Write("./ ird.ird");
+            ird.Write("./test.ird");
             Console.WriteLine(ird.HeaderLength);
         }
     }
