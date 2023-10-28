@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.IO.Hashing;
 
 namespace LibIRD
 {
@@ -91,7 +93,7 @@ namespace LibIRD
             if (size == 0 || (size % 2048) != 0)
                 throw new ArgumentException("ISO Size in bytes must be a positive integer multiple of 2048", nameof(size));
             // Validate layerbreak
-            if (layerbreak == 0 || layerbreak >= size)
+            if (layerbreak == 0 || (layerbreak != BDLayerSize && layerbreak >= size))
                 throw new ArgumentException("Layerbreak in bytes must be a positive integer less than the ISO Size", nameof(size));
 
             // TODO: Generate correct PICs for Hybrid PS3 discs (BD-50 with layerbreak value other than 12219392)
@@ -159,20 +161,30 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Generates the UID field
+        /// Generates the UID field by computing the CRC32 hash of the ISO
         /// </summary>
-        /// <param name="crc32">Redump ISO CRC32 hash</param>
+        /// <param name="isoPath">Full path to the ISO</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        private void GenerateUID(byte[] crc32)
+        private void GenerateUID(string isoPath)
         {
+            // Compute CRC32 hash
+            byte[] crc32;
+            using (FileStream fs = File.OpenRead(isoPath))
+            {
+                Crc32 hasher = new Crc32();
+                hasher.Append(fs);
+                crc32 = hasher.GetCurrentHash();
+                Array.Reverse(crc32);
+            }
+
             // Validate CRC32
             if (crc32 == null)
                 throw new ArgumentNullException(nameof(crc32));
-            if (crc32.Length != 8)
-                throw new ArgumentException("CRC32 hash must be an byte array of length 8", nameof(crc32));
+            if (crc32.Length != 4)
+                throw new ArgumentException("CRC32 hash must be an byte array of length 4", nameof(crc32));
 
-            // Redump ISO CRC32 hash is used as the Unique ID in the IRD
+            // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
             UID = BitConverter.ToUInt32(crc32, 0);
         }
 
@@ -183,13 +195,26 @@ namespace LibIRD
         /// <summary>
         /// Constructor with required redump-style IRD fields
         /// </summary>
-        /// <param name="size">ISO Size in bytes, a multiple of 2048</param>
-        /// <param name="crc32">CRC32 hash of the redump ISO</param>
+        /// <param name="isoPath">Full path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
-        public ReIRD(long size, byte[] crc32, byte[] key)
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        public ReIRD(string isoPath, byte[] key)
         {
+            // Validate ISO path
+            if (isoPath == null || isoPath.Length <= 0)
+                throw new ArgumentNullException(nameof(isoPath));
+
+            // Check file exists
+            var iso = new FileInfo(isoPath);
+            if (!iso.Exists)
+                throw new FileNotFoundException(isoPath);
+
+            // Calculate size of ISO
+            long size = iso.Length;
+
             // Generate Unique Identifier using ISO CRC32
-            GenerateUID(crc32);
+            GenerateUID(isoPath);
 
             // Generate Data 1 using Disc Key
             GenerateD1(key);
@@ -199,19 +224,33 @@ namespace LibIRD
 
             // Generate Disc PIC
             GeneratePIC(size);
+
+            // Generate the IRD hashes
+            Generate(isoPath);
         }
 
         /// <summary>
         /// Constructor with additional region to generate a specific Disc ID
         /// </summary>
-        /// <param name="size">ISO Size in bytes, a multiple of 2048</param>
-        /// <param name="crc32">CRC32 hash of the redump ISO</param>
+        /// <param name="isoPath">Full path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
         /// <param name="region">Disc Region</param>
-        public ReIRD(long size, byte[] crc32, byte[] key, Region region)
+        public ReIRD(string isoPath, byte[] key, Region region)
         {
+            // Check path exists
+            if (isoPath == null || isoPath.Length <= 0)
+                throw new ArgumentNullException(nameof(isoPath));
+
+            // Check file exists
+            var iso = new FileInfo(isoPath);
+            if (!iso.Exists)
+                throw new FileNotFoundException(isoPath);
+
+            // Calculate size of ISO
+            long size = iso.Length;
+
             // Generate Unique Identifier using ISO CRC32
-            GenerateUID(crc32);
+            GenerateUID(isoPath);
 
             // Generate Data 1 using Disc Key
             GenerateD1(key);
@@ -221,24 +260,9 @@ namespace LibIRD
 
             // Generate Disc PIC
             GeneratePIC(size);
-        }
 
-        #endregion
-
-        #region Methods
-
-        /// <summary>
-        /// Generate and write the redump-style IRD file, after any optional IRD fields have been set
-        /// </summary>
-        /// <param name="discPath">Full path to the disc drive / mounted ISO</param>
-        /// <param name="irdPath">Full path to IRD file to be written to</param>
-        public void Create(string discPath, string irdPath)
-        {
             // Generate the IRD hashes
-            Generate(discPath);
-
-            // Write to IRD file
-            Write(irdPath);
+            Generate(isoPath);
         }
 
         #endregion
