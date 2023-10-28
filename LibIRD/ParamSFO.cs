@@ -208,7 +208,10 @@ namespace LibIRD
         /// </summary>
         public void Print()
         {
+            // Build string from parameters
             StringBuilder print = new StringBuilder("PARAM.SFO Contents:\n====================\n");
+
+            // Loop through all parameters in PARAM.SFO
             for (int i = 0; i < ParamCount; i++)
             {
                 print.Append(Params[i].Name);
@@ -226,6 +229,11 @@ namespace LibIRD
                 }
                 print.Append('\n');
             }
+
+            // Ensure UTF-8 will display properly
+            Console.OutputEncoding = Encoding.UTF8;
+
+            // Print formatted string
             Console.Write(print);
         }
     }
