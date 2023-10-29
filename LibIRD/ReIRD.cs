@@ -163,9 +163,7 @@ namespace LibIRD
         /// <summary>
         /// Generates the UID field by computing the CRC32 hash of the ISO
         /// </summary>
-        /// <param name="isoPath">Full path to the ISO</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
+        /// <param name="isoPath">Path to the ISO</param>
         private void GenerateUID(string isoPath)
         {
             // Compute CRC32 hash
@@ -178,12 +176,6 @@ namespace LibIRD
                 Array.Reverse(crc32);
             }
 
-            // Validate CRC32
-            if (crc32 == null)
-                throw new ArgumentNullException(nameof(crc32));
-            if (crc32.Length != 4)
-                throw new ArgumentException("CRC32 hash must be an byte array of length 4", nameof(crc32));
-
             // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
             UID = BitConverter.ToUInt32(crc32, 0);
         }
@@ -195,7 +187,7 @@ namespace LibIRD
         /// <summary>
         /// Constructor with required redump-style IRD fields
         /// </summary>
-        /// <param name="isoPath">Full path to the ISO</param>
+        /// <param name="isoPath">Path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
@@ -232,12 +224,14 @@ namespace LibIRD
         /// <summary>
         /// Constructor with additional region to generate a specific Disc ID
         /// </summary>
-        /// <param name="isoPath">Full path to the ISO</param>
+        /// <param name="isoPath">Path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
         /// <param name="region">Disc Region</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
         public ReIRD(string isoPath, byte[] key, Region region)
         {
-            // Check path exists
+            // Validate ISO path
             if (isoPath == null || isoPath.Length <= 0)
                 throw new ArgumentNullException(nameof(isoPath));
 

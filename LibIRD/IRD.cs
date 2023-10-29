@@ -15,23 +15,35 @@ namespace LibIRD
         #region Constants
 
         /// <summary>
-        /// "3IRD"
+        /// IRD file signature
         /// </summary>
-        /// 
-        public static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
+        /// <remarks>"3IRD"</remarks>
+        private static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
 
         /// <summary>
         /// MD5 hash of null
         /// </summary>
-        public static readonly byte[] NullMD5 = new byte[] {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
+        private static readonly byte[] NullMD5 = new byte[] {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
 
         /// <summary>
-        /// AES encryption/decryption keys and initial values
+        /// AES CBC Encryption Key for Data 1 (Disc Key)
         /// </summary>
-        public static readonly byte[] D1AesKey = { 0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED };
-        public static readonly byte[] D1AesIV = { 0x69, 0x47, 0x47, 0x72, 0xAF, 0x6F, 0xDA, 0xB3, 0x42, 0x74, 0x3A, 0xEF, 0xAA, 0x18, 0x62, 0x87 };
-        public static readonly byte[] D2AesKey = { 0x7C, 0xDD, 0x0E, 0x02, 0x07, 0x6E, 0xFE, 0x45, 0x99, 0xB1, 0xB8, 0x2C, 0x35, 0x99, 0x19, 0xB3 };
-        public static readonly byte[] D2AesIV = { 0x22, 0x26, 0x92, 0x8D, 0x44, 0x03, 0x2F, 0x43, 0x6A, 0xFD, 0x26, 0x7E, 0x74, 0x8B, 0x23, 0x93 };
+        private static readonly byte[] D1AesKey = { 0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED };
+
+        /// <summary>
+        /// AES CBC Initial Value for Data 1 (Disc Key)
+        /// </summary>
+        private static readonly byte[] D1AesIV = { 0x69, 0x47, 0x47, 0x72, 0xAF, 0x6F, 0xDA, 0xB3, 0x42, 0x74, 0x3A, 0xEF, 0xAA, 0x18, 0x62, 0x87 };
+
+        /// <summary>
+        /// AES CBC Encryption Key for Data 2 (Disc ID)
+        /// </summary>
+        private static readonly byte[] D2AesKey = { 0x7C, 0xDD, 0x0E, 0x02, 0x07, 0x6E, 0xFE, 0x45, 0x99, 0xB1, 0xB8, 0x2C, 0x35, 0x99, 0x19, 0xB3 };
+
+        /// <summary>
+        /// AES CBC Initial Value for Data 2 (Disc ID)
+        /// </summary>
+        private static readonly byte[] D2AesIV = { 0x22, 0x26, 0x92, 0x8D, 0x44, 0x03, 0x2F, 0x43, 0x6A, 0xFD, 0x26, 0x7E, 0x74, 0x8B, 0x23, 0x93 };
 
         #endregion
 
@@ -50,7 +62,7 @@ namespace LibIRD
                     _version = value;
             }
         }
-        public byte _version = 9; // Default to latest IRD version = 9
+        private byte _version = 9; // Default to latest IRD version = 9
 
         /// <summary>
         /// Unique Identifier
@@ -83,7 +95,7 @@ namespace LibIRD
         /// <summary>
         /// Uncompressed PIC data
         /// </summary>
-        /// <remarks>115 bytes, before D1/D2 keys on version 9</remarks>
+        /// <remarks>115 bytes</remarks>
         public byte[] PIC { get; set; }
 
         #endregion
@@ -183,7 +195,7 @@ namespace LibIRD
         /// <param name="key">Byte array containing AES encrypted Disc Key</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        protected void GenerateD1(byte[] key)
+        private protected void GenerateD1(byte[] key)
         {
             // Validate key
             if (key == null || key.Length <= 0)
@@ -224,7 +236,7 @@ namespace LibIRD
         /// <param name="id">Byte array containing AES decrypted Disc ID</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        protected void GenerateD2(byte[] id)
+        private protected void GenerateD2(byte[] id)
         {
             // Validate id
             if (id == null || id.Length <= 0)
@@ -276,7 +288,7 @@ namespace LibIRD
         /// <summary>
         /// Constructor that reads an existing IRD file and stores its fields in the IRD object
         /// </summary>
-        /// <param name="irdPath">Full path to IRD file to read data from</param>
+        /// <param name="irdPath">Path to IRD file to read data from</param>
         public IRD(string irdPath)
         {
             Read(irdPath);
@@ -285,13 +297,13 @@ namespace LibIRD
         /// <summary>
         /// Public Constructor must be called with required fields
         /// </summary>
-        /// <param name="discPath">Full path to the disc drive / mounted ISO</param>
+        /// <param name="discPath">Path to the ISO</param>
         /// <param name="discKey">Disc Key, byte array of length 16</param>
         /// <param name="discID">Disc ID, byte array of length 16</param>
-        /// <param name="discPIC">Disc PIC, bye array of length 115</param>
+        /// <param name="discPIC">Disc PIC, byte array of length 115</param>
         public IRD(string discPath, byte[] discKey, byte[] discID, byte[] discPIC)
         {
-            // Store IRD fields that cannot be determined from the disc drive or mounted ISO
+            // Store IRD fields that cannot be determined from the ISO
             GenerateD1(discKey);
             GenerateD2(discID);
             PIC = discPIC;
@@ -307,13 +319,13 @@ namespace LibIRD
         /// <summary>
         /// Generate IRD fields from a disc drive or mounted ISO
         /// </summary>
-        /// <param name="discPath">Full path to the disc drive / mounted ISO</param>
+        /// <param name="isoPath">Path to the ISO</param>
         /// <exception cref="ArgumentException"></exception>
-        public void Generate(string discPath)
+        private protected void Generate(string isoPath)
         {
-            // TODO: Check that discPath is a valid disc drive/ISO
-            if (discPath == null)
-                throw new ArgumentNullException(nameof(discPath));
+            // Validate ISO path
+            if (isoPath == null || isoPath.Length <= 0)
+                throw new ArgumentNullException(nameof(isoPath));
 
             // TODO: Code the difficult part (remove these initial values)
             TitleID = "ABCD12345";
@@ -341,7 +353,7 @@ namespace LibIRD
         /// <summary>
         /// Read IRD data from file, store fields into class
         /// </summary>
-        /// <param name="irdPath">Full path to IRD file to read data from</param>
+        /// <param name="irdPath">Path to IRD file to read data from</param>
         /// <exception cref="ArgumentException"></exception>
         public void Read(string irdPath)
         {
@@ -375,12 +387,15 @@ namespace LibIRD
         /// <summary>
         /// Write IRD data to file
         /// </summary>
-        /// <param name="filePath">Full path to IRD file to be written to</param>
-        public void Write(string filePath)
+        /// <param name="irdPath">Path to IRD file to be written to</param>
+        public void Write(string irdPath)
         {
-            // TODO: Check filePath is a valid path for a new IRD file
+            // Validate irdPath
+            if (irdPath == null || irdPath.Length <= 0)
+                throw new ArgumentNullException(nameof(irdPath));
+
             // Create the IRD file stream
-            using (FileStream fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            using (FileStream fs = new FileStream(irdPath, FileMode.Create, FileAccess.Write))
             {
                 // Create a GZipped IRD file stream
                 using (GZipStream outStream = new GZipStream(fs, CompressionLevel.Optimal))
