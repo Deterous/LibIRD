@@ -180,12 +180,7 @@ namespace LibIRD
         /// <remarks><see cref="FileHashes"/> files, 16-bytes per hash, alternating with each <see cref="FileHashes"/> entry</remarks>
         public byte[][] FileHashes { get; private set; }
 
-        /// <summary>
-        /// IRD content CRC
-        /// </summary>
-        public uint CRC { get; private set; }
-
-        #endregion
+            #endregion
 
         #region Generate Fields
 
@@ -275,8 +270,6 @@ namespace LibIRD
 
         #region Constructors
 
-        // TODO: Constructor using D1 and D2 directly, rather than Disc Key / Disc ID
-
         /// <summary>
         /// Default constructor for internal derived classes only: resulting object not in usable state
         /// </summary>
@@ -295,26 +288,121 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Public Constructor must be called with required fields
+        /// Constructor that reads required fields from .getkey.log file
         /// </summary>
-        /// <param name="discPath">Path to the ISO</param>
+        /// <param name="isoPath"></param>
+        /// <param name="getKeyLog"></param>
+        public IRD(string isoPath, string getKeyLog)
+        {
+            // Parse Disc Key, Disc ID, and PIC from the .getkey.log file
+            ParseGetKeyLog(getKeyLog);
+
+            // Generate the remaining IRD fields from the disc drive or mounted ISO
+            Generate(isoPath);
+        }
+
+        /// <summary>
+        /// Constructor with given required fields
+        /// </summary>
+        /// <param name="isoPath">Path to the ISO</param>
         /// <param name="discKey">Disc Key, byte array of length 16</param>
         /// <param name="discID">Disc ID, byte array of length 16</param>
         /// <param name="discPIC">Disc PIC, byte array of length 115</param>
-        public IRD(string discPath, byte[] discKey, byte[] discID, byte[] discPIC)
+        public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC)
         {
-            // Store IRD fields that cannot be determined from the ISO
+            // Parse DiscKey, DiscID, and PIC
             GenerateD1(discKey);
             GenerateD2(discID);
             PIC = discPIC;
 
             // Generate the remaining IRD fields from the disc drive or mounted ISO
-            Generate(discPath);
+            Generate(isoPath);
         }
 
         #endregion
 
         #region Methods
+
+        private protected void ParseGetKeyLog(string getKeyLog)
+        {
+            // Validate getKeyLog
+            if (getKeyLog == null || !File.Exists(getKeyLog))
+                throw new ArgumentNullException(nameof(getKeyLog));
+
+            // Read from .getkey.log file
+            byte[] discKey;
+            byte[] discID;
+            byte[] discPIC;
+            using (var sr = File.OpenText(getKeyLog))
+            {
+                string line;
+                
+                // Determine whether GetKey was successful
+                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("get_dec_key succeeded!") == false) ;
+                if (line == null)
+                    throw new InvalidDataException(".getkey.log contains errors");
+
+                // Look for Disc Key in log
+                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_key = ") == false) ;
+                if (line == null)
+                    throw new InvalidDataException("Could not find Disc Key in .getkey.log");
+                // Get Disc Key from log
+                string discKeyStr = line.Substring("disc_key = ".Length);
+                // Validate Disc Key from log
+                if (discKeyStr.Length != 32)
+                    throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
+                // Convert Disc Key to byte array
+                discKey = Utilities.HexToBytes(discKeyStr);
+
+                // Read Disc ID
+                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_id = ") == false) ;
+                if (line == null)
+                    throw new InvalidDataException("Could not find Disc ID in .getkey.log");
+                // Get Disc ID from log
+                string discIDStr = line.Substring("disc_id = ".Length);
+                // Validate Disc ID from log
+                if (discIDStr.Length != 32)
+                    throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
+                // Replace X's in Disc ID with 00000001
+                discIDStr = discIDStr.Substring(0, 24) + "00000001";
+                // Convert Disc ID to byte array
+                discID = Utilities.HexToBytes(discIDStr);
+
+                // Look for PIC in log
+                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("PIC:") == false) ;
+                if (line == null)
+                    throw new InvalidDataException("Could not find PIC in .getkey.log");
+                // Get PIC from log
+                string discPICStr = "";
+                for (int i = 0; i < 8; i++)
+                {
+                    line = sr.ReadLine();
+                    if (line == null)
+                        throw new InvalidDataException("Incomplete PIC in .getkey.log");
+                    discPICStr += line;
+                }
+                // Validate PIC from log
+                if (discPICStr.Length != 256)
+                    throw new InvalidDataException("Unexpected PIC in .getkey.log");
+                // Convert PIC to byte array
+                discPIC = Utilities.HexToBytes(discPICStr.Substring(0, 230));
+
+                // Check for warnings in .getkey.log
+                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
+                {
+                    string t = line.Trim();
+                    if (t.StartsWith("WARNING"))
+                        throw new InvalidDataException(".getkey.log contains errors");
+                    else if (t.StartsWith("SUCCESS"))
+                        break;
+                }
+            }
+
+            // Store values
+            GenerateD1(discKey);
+            GenerateD2(discID);
+            PIC = discPIC;
+        }
 
         /// <summary>
         /// Generate IRD fields from a disc drive or mounted ISO
@@ -330,7 +418,7 @@ namespace LibIRD
             // TODO: Code the difficult part (remove these initial values)
             TitleID = "ABCD12345";
             Title = "Title";
-            SystemVersion = "01.00";
+            SystemVersion = "1.00";
             GameVersion = "01.00";
             AppVersion = "01.00";
             HeaderLength = 1;
@@ -341,13 +429,14 @@ namespace LibIRD
             Footer[0] = 0x00;
             RegionCount = 1;
             RegionHashes = new byte[RegionCount][];
-            RegionHashes[0] = new byte[] { 0x00 };
+            for (int i = 0; i < RegionCount; i++)
+                RegionHashes[i] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             FileCount = 1;
             FileKeys = new ulong[FileCount];
             FileKeys[0] = 0x00;
             FileHashes = new byte[FileCount][];
-            FileHashes[0] = new byte[] { 0x00 };
-            FileHashes[0][0] = 0x00;
+            for (int i = 0; i < FileCount; i++)
+                FileHashes[i] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         }
 
         /// <summary>
@@ -357,7 +446,7 @@ namespace LibIRD
         /// <exception cref="ArgumentException"></exception>
         public void Read(string irdPath)
         {
-            // TODO: Check irdPath is a valid IRD file path
+            // TODO: Validate irdPath
             if (irdPath == null || !File.Exists(irdPath))
                 throw new ArgumentException("IRD File Path invalid", nameof(irdPath));
 
@@ -375,13 +464,14 @@ namespace LibIRD
             Footer[0] = 0x00;
             RegionCount = 1;
             RegionHashes = new byte[RegionCount][];
-            RegionHashes[0] = new byte[] { 0x00 };
+            for (int i = 0; i < RegionCount; i++)
+                RegionHashes[i] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             FileCount = 1;
             FileKeys = new ulong[FileCount];
             FileKeys[0] = 0x00;
             FileHashes = new byte[FileCount][];
-            FileHashes[0] = new byte[] { 0x00 };
-            FileHashes[0][0] = 0x00;
+            for (int i = 0; i < FileCount; i++)
+                FileHashes[i] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         }
 
         /// <summary>
@@ -401,7 +491,7 @@ namespace LibIRD
                 using (GZipStream outStream = new GZipStream(fs, CompressionLevel.Optimal))
                 {
                     // Keep track of the little-endian 32-bit "IEEE 802.3" CRC value
-                    Crc32 crcStream = new Crc32();
+                    Crc32 crc32 = new Crc32();
 
                     // Write IRD data to stream in order
                     using (BinaryWriter bw = new BinaryWriter(outStream))
@@ -410,7 +500,7 @@ namespace LibIRD
                         bw.Write(Magic);
 
                         // IRD File Version
-                        bw.Write(_version);
+                        bw.Write(Version);
 
                         // PARAM.SFO / TITLE_ID
                         byte[] titleIDBuf = Encoding.ASCII.GetBytes(TitleID);
@@ -461,7 +551,10 @@ namespace LibIRD
                         for (int i = 0; i < FileCount; i++)
                         {
                             bw.Write(FileKeys[i]);
-                            bw.Write(FileHashes[i], 0, 16);
+                            if (FileHashes[i] == null)
+                                bw.Write(NullMD5);
+                            else
+                                bw.Write(FileHashes[i], 0, 16);
                         }
 
                         // Reserved fields
@@ -484,12 +577,8 @@ namespace LibIRD
                         if (_version > 7)
                             bw.Write(UID);
                     }
-
-                    // Calculate final CRC32
-                    CRC = BitConverter.ToUInt32(crcStream.GetCurrentHash(), 0);
-
                     // Write final CRC32 to stream
-                    outStream.Write(BitConverter.GetBytes(CRC), 0, 4);
+                    outStream.Write(crc32.GetCurrentHash(), 0, 4);
                 }
             }
         }
