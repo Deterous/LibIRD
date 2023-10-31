@@ -209,11 +209,17 @@ namespace LibIRD
             // Parse .getkey.log for the Disc Key (Data1Key)
             ParseGetKeyLog(getKeyLog);
 
-            // Generate Data 2 using Disc ID, discarding ID from getKeyLog
+            // Generate Data 2 using Disc ID
             GenerateD2(GenerateID(size));
+            byte[] d2 = Data2Key;
+            if (!((ReadOnlySpan<byte>)Data2Key).SequenceEqual(d2))
+                throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
 
-            // Generate Disc PIC, discarding PIC from getKeyLog
+            // Generate Disc PIC
+            byte[] pic = PIC;
             GeneratePIC(size);
+            if (!((ReadOnlySpan<byte>) PIC).SequenceEqual(pic))
+                throw new InvalidDataException("Unexpected PIC in .getkey.log");
 
             // Generate Unique Identifier using ISO CRC32
             GenerateUID(isoPath);

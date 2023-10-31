@@ -84,19 +84,52 @@ namespace LibIRD
         /// D1 key
         /// </summary>
         /// <remarks>16 bytes</remarks>
-        public byte[] Data1Key { get; set; }
+        public byte[] Data1Key
+        {
+            get { return _data1Key; }
+            set
+            {
+                if (value != null && value.Length == 16)
+                    _data1Key = value;
+                else
+                    throw new ArgumentException("Data 1 Key must be a byte array of length 16", nameof(value));
+            }
+        }
+        private byte[] _data1Key;
 
         /// <summary>
         /// D2 key
         /// </summary>
         /// <remarks>16 bytes</remarks>
-        public byte[] Data2Key { get; set; }
+        public byte[] Data2Key
+        {
+            get { return _data2Key; }
+            set
+            {
+                if (value != null && value.Length == 16)
+                    _data2Key = value;
+                else
+                    throw new ArgumentException("Data 2 Key must be a byte array of length 16", nameof(value));
+}
+        }
+        private byte[] _data2Key;
 
         /// <summary>
         /// Uncompressed PIC data
         /// </summary>
         /// <remarks>115 bytes</remarks>
-        public byte[] PIC { get; set; }
+        public byte[] PIC
+        {
+            get { return _pic; }
+            set
+            {
+                if (value != null && value.Length == 115)
+                    _pic = value;
+                else
+                    throw new ArgumentException("PIC must be a byte array of length 115", nameof(value));
+            }
+        }
+        private byte[] _pic;
 
         #endregion
 
@@ -181,7 +214,7 @@ namespace LibIRD
         public byte[][] FileHashes { get; private set; }
 
         /// <summary>
-        /// Gzipped IRD content 32-bit CRC "IEEE 802.3" hash, little endian
+        /// IRD content 32-bit CRC "IEEE 802.3" hash, little endian
         /// </summary>
         public uint CRC { get; private set; }
 
@@ -386,12 +419,7 @@ namespace LibIRD
                 // Get PIC from log
                 string discPICStr = "";
                 for (int i = 0; i < 8; i++)
-                {
-                    line = sr.ReadLine();
-                    if (line == null)
-                        throw new InvalidDataException("Incomplete PIC in .getkey.log");
-                    discPICStr += line;
-                }
+                    discPICStr += sr.ReadLine() ?? throw new InvalidDataException("Incomplete PIC in .getkey.log");
                 // Validate PIC from log
                 if (discPICStr.Length != 256)
                     throw new InvalidDataException("Unexpected PIC in .getkey.log");
