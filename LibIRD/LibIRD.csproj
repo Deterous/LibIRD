@@ -7,6 +7,9 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="DiscUtils.Core" Version="0.16.13" />
+    <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
+    <PackageReference Include="DiscUtils.Streams" Version="0.16.13" />
     <PackageReference Include="System.IO.Hashing" Version="7.0.0" />
   </ItemGroup>
 
