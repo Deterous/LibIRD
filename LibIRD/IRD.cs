@@ -195,7 +195,7 @@ namespace LibIRD
             if (discKeyStr.Length != 32)
                 throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
             // Convert Disc Key to byte array
-            discKey = Utilities.HexToBytes(discKeyStr);
+            discKey = Convert.FromHexString(discKeyStr);
 
             // Read Disc ID
             byte[] discID;
@@ -210,7 +210,7 @@ namespace LibIRD
             // Replace X's in Disc ID with 00000001
             discIDStr = discIDStr[..24] + "00000001";
             // Convert Disc ID to byte array
-            discID = Utilities.HexToBytes(discIDStr);
+            discID = Convert.FromHexString(discIDStr);
 
             // Look for PIC in log
             byte[] discPIC;
@@ -225,7 +225,7 @@ namespace LibIRD
             if (discPICStr.Length != 256)
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");
             // Convert PIC to byte array
-            discPIC = Utilities.HexToBytes(discPICStr[..230]);
+            discPIC = Convert.FromHexString(discPICStr[..230]);
 
             // Double check for warnings in .getkey.log
             while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
