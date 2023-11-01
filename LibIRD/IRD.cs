@@ -8,8 +8,9 @@ using System.Text;
 namespace LibIRD
 {
     /// <summary>
-    /// ISO Rebuild Data: Generation and writing to IRD file
+    /// ISO Rebuild Data
     /// </summary>
+    /// <remarks>Generates IRD fields and writes to an IRD file</remarks>
     public class IRD : PS3ISO
     {
         #region Constants
@@ -18,7 +19,7 @@ namespace LibIRD
         /// IRD file signature
         /// </summary>
         /// <remarks>"3IRD"</remarks>
-        private static readonly byte[] Magic = new byte[] { 0x33, 0x49, 0x52, 0x44 };
+        private static readonly byte[] Magic = { 0x33, 0x49, 0x52, 0x44 };
 
         /// <summary>
         /// AES CBC Encryption Key for Data 1 (Disc Key)
@@ -66,14 +67,16 @@ namespace LibIRD
         public uint UID { get; set; } = 0x00000000; // Default to zeroed UID
 
         /// <summary>
-        /// Extra Config, usually 0x0000
+        /// Extra Config
         /// </summary>
-        public ushort ExtraConfig { get; set; } = 0x0000;
+        /// <remarks>Reserved, usually set to 0x0000</remarks>
+        public ushort ExtraConfig { get; set; } = 0x0000; // Default to zero
 
         /// <summary>
-        /// Attachments, usually 0x0000
+        /// Attachments
         /// </summary>
-        public ushort Attachments { get; set; } = 0x0000;
+        /// <remarks>Reserved, usually set to 0x0000</remarks>
+        public ushort Attachments { get; set; } = 0x0000; // Default to zero
 
         /// <summary>
         /// D1 key
@@ -139,12 +142,12 @@ namespace LibIRD
         private protected void GenerateD1(byte[] key)
         {
             // Validate key
-            if (key == null || key.Length <= 0)
+            if (key == null)
                 throw new ArgumentNullException(nameof(key));
             if (key.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
-            // AES decryption
+            // Setup AES decryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
 
             // Set AES settings
@@ -154,14 +157,14 @@ namespace LibIRD
             aes.Mode = CipherMode.CBC;
 
             // Perform AES decryption
-            using ICryptoTransform decryptor = aes.CreateDecryptor();
-            MemoryStream ms = new();
-            CryptoStream cs = new(ms, decryptor, CryptoStreamMode.Write);
+            using MemoryStream stream = new();
+            using ICryptoTransform dec = aes.CreateDecryptor();
+            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
             cs.Write(key, 0, 16);
             cs.FlushFinalBlock();
-            Data1Key = ms.ToArray();
-            ms.Close();
-            cs.Close();
+
+            // Save decrypted key to field
+            Data1Key = stream.ToArray();
         }
 
         /// <summary>
@@ -173,12 +176,12 @@ namespace LibIRD
         private protected void GenerateD2(byte[] id)
         {
             // Validate id
-            if (id == null || id.Length <= 0)
+            if (id == null)
                 throw new ArgumentNullException(nameof(id));
             if (id.Length != 16)
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
 
-            // AES encryption
+            // Setup AES encryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
 
             // Set AES settings
@@ -188,14 +191,14 @@ namespace LibIRD
             aes.Mode = CipherMode.CBC;
 
             // Perform AES encryption
-            using ICryptoTransform encryptor = aes.CreateEncryptor();
-            MemoryStream ms = new();
-            CryptoStream cs = new(ms, encryptor, CryptoStreamMode.Write);
+            using MemoryStream stream = new();
+            using ICryptoTransform enc = aes.CreateEncryptor();
+            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
             cs.Write(id, 0, 16);
             cs.FlushFinalBlock();
-            Data2Key = ms.ToArray();
-            ms.Close();
-            cs.Close();
+
+            // Save encrypted key to field
+            Data2Key = stream.ToArray();
         }
 
         #endregion
@@ -207,7 +210,7 @@ namespace LibIRD
         /// </summary>
         private protected IRD(string isoPath) : base(isoPath)
         {
-            // Assumes that derived class will set private variables and generate in its own constructor
+            // Assumes that internally derived class will set D1/D2/PIC in its own constructor
         }
 
         /// <summary>
@@ -228,78 +231,78 @@ namespace LibIRD
         /// <summary>
         /// Constructor that reads required fields from .getkey.log file
         /// </summary>
-        /// <param name="isoPath"></param>
-        /// <param name="getKeyLog"></param>
+        /// <param name="isoPath">Path to the ISO</param>
+        /// <param name="getKeyLog">Path to the .getkey.log file</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="InvalidDataException"></exception>
         public IRD(string isoPath, string getKeyLog) : base(isoPath)
         {
             // Validate .getkey.log file path
-            if (getKeyLog == null || !File.Exists(getKeyLog))
+            if (getKeyLog == null)
                 throw new ArgumentNullException(nameof(getKeyLog));
-
-            // Initialise fields
-            byte[] discKey;
-            byte[] discID;
-            byte[] discPIC;
+            if (!File.Exists(getKeyLog))
+                throw new FileNotFoundException(nameof(getKeyLog));
 
             // Read from .getkey.log file
-            using (var sr = File.OpenText(getKeyLog))
+            using StreamReader sr = File.OpenText(getKeyLog);
+
+            // Determine whether GetKey was successful
+            string line;
+            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("get_dec_key succeeded!") == false) ;
+            if (line == null)
+                throw new InvalidDataException(".getkey.log contains errors");
+
+            // Look for Disc Key in log
+            byte[] discKey;
+            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_key = ") == false) ;
+            if (line == null)
+                throw new InvalidDataException("Could not find Disc Key in .getkey.log");
+            // Get Disc Key from log
+            string discKeyStr = line["disc_key = ".Length..];
+            // Validate Disc Key from log
+            if (discKeyStr.Length != 32)
+                throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
+            // Convert Disc Key to byte array
+            discKey = Utilities.HexToBytes(discKeyStr);
+
+            // Read Disc ID
+            byte[] discID;
+            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_id = ") == false) ;
+            if (line == null)
+                throw new InvalidDataException("Could not find Disc ID in .getkey.log");
+            // Get Disc ID from log
+            string discIDStr = line["disc_id = ".Length..];
+            // Validate Disc ID from log
+            if (discIDStr.Length != 32)
+                throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
+            // Replace X's in Disc ID with 00000001
+            discIDStr = discIDStr[..24] + "00000001";
+            // Convert Disc ID to byte array
+            discID = Utilities.HexToBytes(discIDStr);
+
+            // Look for PIC in log
+            byte[] discPIC;
+            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("PIC:") == false) ;
+            if (line == null)
+                throw new InvalidDataException("Could not find PIC in .getkey.log");
+            // Get PIC from log
+            string discPICStr = "";
+            for (int i = 0; i < 8; i++)
+                discPICStr += sr.ReadLine() ?? throw new InvalidDataException("Incomplete PIC in .getkey.log");
+            // Validate PIC from log
+            if (discPICStr.Length != 256)
+                throw new InvalidDataException("Unexpected PIC in .getkey.log");
+            // Convert PIC to byte array
+            discPIC = Utilities.HexToBytes(discPICStr[..230]);
+
+            // Double check for warnings in .getkey.log
+            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
             {
-                string line;
-
-                // Determine whether GetKey was successful
-                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("get_dec_key succeeded!") == false) ;
-                if (line == null)
+                string t = line.Trim();
+                if (t.StartsWith("WARNING"))
                     throw new InvalidDataException(".getkey.log contains errors");
-
-                // Look for Disc Key in log
-                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_key = ") == false) ;
-                if (line == null)
-                    throw new InvalidDataException("Could not find Disc Key in .getkey.log");
-                // Get Disc Key from log
-                string discKeyStr = line["disc_key = ".Length..];
-                // Validate Disc Key from log
-                if (discKeyStr.Length != 32)
-                    throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
-                // Convert Disc Key to byte array
-                discKey = Utilities.HexToBytes(discKeyStr);
-
-                // Read Disc ID
-                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("disc_id = ") == false) ;
-                if (line == null)
-                    throw new InvalidDataException("Could not find Disc ID in .getkey.log");
-                // Get Disc ID from log
-                string discIDStr = line["disc_id = ".Length..];
-                // Validate Disc ID from log
-                if (discIDStr.Length != 32)
-                    throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
-                // Replace X's in Disc ID with 00000001
-                discIDStr = discIDStr[..24] + "00000001";
-                // Convert Disc ID to byte array
-                discID = Utilities.HexToBytes(discIDStr);
-
-                // Look for PIC in log
-                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("PIC:") == false) ;
-                if (line == null)
-                    throw new InvalidDataException("Could not find PIC in .getkey.log");
-                // Get PIC from log
-                string discPICStr = "";
-                for (int i = 0; i < 8; i++)
-                    discPICStr += sr.ReadLine() ?? throw new InvalidDataException("Incomplete PIC in .getkey.log");
-                // Validate PIC from log
-                if (discPICStr.Length != 256)
-                    throw new InvalidDataException("Unexpected PIC in .getkey.log");
-                // Convert PIC to byte array
-                discPIC = Utilities.HexToBytes(discPICStr[..230]);
-
-                // Check for warnings in .getkey.log
-                while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
-                {
-                    string t = line.Trim();
-                    if (t.StartsWith("WARNING"))
-                        throw new InvalidDataException(".getkey.log contains errors");
-                    else if (t.StartsWith("SUCCESS"))
-                        break;
-                }
+                else if (t.StartsWith("SUCCESS"))
+                    break;
             }
 
             // Parse DiscKey, DiscID, and PIC
@@ -315,15 +318,16 @@ namespace LibIRD
         /// <summary>
         /// Write IRD data to file
         /// </summary>
-        /// <param name="irdPath">Path to IRD file to be written to</param>
+        /// <param name="irdPath">Path to the ISO</param>
+        /// <exception cref="ArgumentNullException"></exception>
         public void Write(string irdPath)
         {
             // Validate irdPath
             if (irdPath == null || irdPath.Length <= 0)
                 throw new ArgumentNullException(nameof(irdPath));
 
-            // Create new stream to write to
-            MemoryStream stream = new();
+            // Create new stream to uncompressed IRD contents
+            using MemoryStream stream = new();
 
             // Write IRD data to stream in order
             using (BinaryWriter bw = new(stream, Encoding.UTF8, true))
@@ -410,7 +414,7 @@ namespace LibIRD
                     bw.Write(UID);
             }
 
-            // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the entire stream
+            // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the IRD contents so far
             stream.Position = 0;
             Crc32 crc32 = new();
             crc32.Append(stream);
@@ -426,7 +430,6 @@ namespace LibIRD
             // Write entire gzipped IRD stream to file
             stream.Position = 0;
             stream.CopyTo(gzStream);
-            stream.Close();
         }
 
         #endregion

@@ -12,7 +12,7 @@ namespace PrintParams
 
             if (File.Exists(filename))
             {
-                ParamSFO paramSFO = new ParamSFO("./PARAM.SFO");
+                ParamSFO paramSFO = new("./PARAM.SFO");
                 Console.WriteLine(paramSFO["TITLE_ID"]);
                 paramSFO.Print();
             }

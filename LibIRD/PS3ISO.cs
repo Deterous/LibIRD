@@ -195,7 +195,7 @@ namespace LibIRD
             RegionHashes = new byte[RegionCount][];
             for (int i = 0; i < RegionCount; i++)
                 RegionHashes[i] = NullMD5;
-            FileCount = 1;
+            FileCount = 13;
             FileKeys = new ulong[FileCount];
             for (int i = 0; i < FileCount; i++)
                 FileKeys[i] = (ulong)(i * 16);
