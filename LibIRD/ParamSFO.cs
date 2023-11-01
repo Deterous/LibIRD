@@ -126,8 +126,8 @@ namespace LibIRD
                 throw new ArgumentNullException(nameof(sfoPath));
 
             // Read file as a stream, and parse file
-            using (FileStream fs = new FileStream(sfoPath, FileMode.Open, FileAccess.Read))
-                Parse(fs);
+            using FileStream fs = new(sfoPath, FileMode.Open, FileAccess.Read);
+            Parse(fs);
         }
 
         /// <summary>
@@ -138,67 +138,66 @@ namespace LibIRD
         private void Parse(Stream sfoStream)
         {
             // Read binary stream
-            using (BinaryReader br = new BinaryReader(sfoStream))
+            using BinaryReader br = new(sfoStream);
+
+            // Check file signature is correct
+            string magic = Encoding.ASCII.GetString(br.ReadBytes(4));
+            if (magic != ParamSFO.Magic)
+                throw new FileLoadException("Not a valid PARAM.SFO file");
+
+            // Parse header
+            Version = br.ReadUInt32();
+            KeyTableStart = br.ReadUInt32();
+            DataTableStart = br.ReadUInt32();
+            ParamCount = br.ReadUInt32();
+
+            // Parse parameter metadata
+            Params = new Param[ParamCount];
+            for (int i = 0; i < ParamCount; i++)
             {
-                // Check file signature is correct
-                string magic = Encoding.ASCII.GetString(br.ReadBytes(4));
-                if (magic != ParamSFO.Magic)
-                    throw new FileLoadException("Not a valid PARAM.SFO file");
-
-                // Parse header
-                Version = br.ReadUInt32();
-                KeyTableStart = br.ReadUInt32();
-                DataTableStart = br.ReadUInt32();
-                ParamCount = br.ReadUInt32();
-
-                // Parse parameter metadata
-                Params = new Param[ParamCount];
-                for (int i = 0; i < ParamCount; i++)
+                Params[i] = new Param
                 {
-                    Params[i] = new Param
-                    {
-                        KeyOffset = br.ReadUInt16(),
-                        DataFormat = br.ReadUInt16(),
-                        DataLength = br.ReadUInt32(),
-                        DataTotal = br.ReadUInt32(),
-                        DataOffset = br.ReadUInt32()
-                    };
-                }
+                    KeyOffset = br.ReadUInt16(),
+                    DataFormat = br.ReadUInt16(),
+                    DataLength = br.ReadUInt32(),
+                    DataTotal = br.ReadUInt32(),
+                    DataOffset = br.ReadUInt32()
+                };
+            }
 
-                // Parse parameters
-                for (int i = 0; i < ParamCount; i++)
+            // Parse parameters
+            for (int i = 0; i < ParamCount; i++)
+            {
+                // Move stream to ith key
+                sfoStream.Position = KeyTableStart + Params[i].KeyOffset;
+
+                // Determine ith key length
+                uint keyLen = ((i == ParamCount - 1) ? DataTableStart - KeyTableStart : Params[i + 1].KeyOffset)
+                            - Params[i].KeyOffset;
+
+                // Read ith key name
+                Params[i].Name = Encoding.ASCII.GetString(br.ReadBytes((int) keyLen)).TrimEnd('\0');
+
+                // Move stream to ith data
+                sfoStream.Position = DataTableStart + Params[i].DataOffset;
+
+                // Read ith data, based on data format
+                switch (Params[i].DataFormat)
                 {
-                    // Move stream to ith key
-                    sfoStream.Position = KeyTableStart + Params[i].KeyOffset;
-
-                    // Determine ith key length
-                    uint keyLen = ((i == ParamCount - 1) ? DataTableStart - KeyTableStart : Params[i + 1].KeyOffset)
-                                - Params[i].KeyOffset;
-
-                    // Read ith key name
-                    Params[i].Name = Encoding.ASCII.GetString(br.ReadBytes((int) keyLen)).TrimEnd('\0');
-
-                    // Move stream to ith data
-                    sfoStream.Position = DataTableStart + Params[i].DataOffset;
-
-                    // Read ith data, based on data format
-                    switch (Params[i].DataFormat)
-                    {
-                        case 0x0400: // Non-null-terminated UTF-8 String
-                            Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength));
-                            break;
-                        case 0x0402: // Null-terminated UTF-8 String
-                            Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
-                            break;
-                        case 0x0404: // Integer
-                            //if (Params[i].DataLength != 4)
-                                //throw new ArgumentException("Integer parameter not 4 bytes?");
-                            Params[i].IntValue = br.ReadInt32();
-                            break;
-                        default: // Unknown data format, assume null-terminated string
-                            Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
-                            break;
-                    }
+                    case 0x0400: // Non-null-terminated UTF-8 String
+                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength));
+                        break;
+                    case 0x0402: // Null-terminated UTF-8 String
+                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
+                        break;
+                    case 0x0404: // Integer
+                                 //if (Params[i].DataLength != 4)
+                                 //throw new ArgumentException("Integer parameter not 4 bytes?");
+                        Params[i].IntValue = br.ReadInt32();
+                        break;
+                    default: // Unknown data format, assume null-terminated string
+                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
+                        break;
                 }
             }
         }
@@ -209,7 +208,7 @@ namespace LibIRD
         public void Print()
         {
             // Build string from parameters
-            StringBuilder print = new StringBuilder("PARAM.SFO Contents:\n====================\n");
+            StringBuilder print = new("PARAM.SFO Contents:\n====================\n");
 
             // Loop through all parameters in PARAM.SFO
             for (int i = 0; i < ParamCount; i++)

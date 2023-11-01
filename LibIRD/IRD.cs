@@ -131,75 +131,7 @@ namespace LibIRD
 
         #endregion
 
-        #region Generate Keys
-
-        /// <summary>
-        /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
-        /// </summary>
-        /// <param name="key">Byte array containing AES encrypted Disc Key</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD1(byte[] key)
-        {
-            // Validate key
-            if (key == null)
-                throw new ArgumentNullException(nameof(key));
-            if (key.Length != 16)
-                throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
-
-            // Setup AES decryption
-            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
-
-            // Set AES settings
-            aes.Key = D1AesKey;
-            aes.IV = D1AesIV;
-            aes.Padding = PaddingMode.None;
-            aes.Mode = CipherMode.CBC;
-
-            // Perform AES decryption
-            using MemoryStream stream = new();
-            using ICryptoTransform dec = aes.CreateDecryptor();
-            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
-            cs.Write(key, 0, 16);
-            cs.FlushFinalBlock();
-
-            // Save decrypted key to field
-            Data1Key = stream.ToArray();
-        }
-
-        /// <summary>
-        /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
-        /// </summary>
-        /// <param name="id">Byte array containing AES decrypted Disc ID</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD2(byte[] id)
-        {
-            // Validate id
-            if (id == null)
-                throw new ArgumentNullException(nameof(id));
-            if (id.Length != 16)
-                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
-
-            // Setup AES encryption
-            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
-
-            // Set AES settings
-            aes.Key = D2AesKey;
-            aes.IV = D2AesIV;
-            aes.Padding = PaddingMode.None;
-            aes.Mode = CipherMode.CBC;
-
-            // Perform AES encryption
-            using MemoryStream stream = new();
-            using ICryptoTransform enc = aes.CreateEncryptor();
-            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
-            cs.Write(id, 0, 16);
-            cs.FlushFinalBlock();
-
-            // Save encrypted key to field
-            Data2Key = stream.ToArray();
-        }
+        #region Helper Functions
 
         #endregion
 
@@ -314,6 +246,74 @@ namespace LibIRD
         #endregion
 
         #region Methods
+
+        /// <summary>
+        /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
+        /// </summary>
+        /// <param name="key">Byte array containing AES encrypted Disc Key</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        private protected void GenerateD1(byte[] key)
+        {
+            // Validate key
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+            if (key.Length != 16)
+                throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
+
+            // Setup AES decryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D1AesKey;
+            aes.IV = D1AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES decryption
+            using MemoryStream stream = new();
+            using ICryptoTransform dec = aes.CreateDecryptor();
+            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
+            cs.Write(key, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save decrypted key to field
+            Data1Key = stream.ToArray();
+        }
+
+        /// <summary>
+        /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
+        /// </summary>
+        /// <param name="id">Byte array containing AES decrypted Disc ID</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        private protected void GenerateD2(byte[] id)
+        {
+            // Validate id
+            if (id == null)
+                throw new ArgumentNullException(nameof(id));
+            if (id.Length != 16)
+                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
+
+            // Setup AES encryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D2AesKey;
+            aes.IV = D2AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES encryption
+            using MemoryStream stream = new();
+            using ICryptoTransform enc = aes.CreateEncryptor();
+            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
+            cs.Write(id, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save encrypted key to field
+            Data2Key = stream.ToArray();
+        }
 
         /// <summary>
         /// Write IRD data to file

@@ -170,7 +170,7 @@ namespace LibIRD
             byte[] crc32;
             using (FileStream fs = File.OpenRead(isoPath))
             {
-                Crc32 hasher = new Crc32();
+                Crc32 hasher = new();
                 hasher.Append(fs);
                 crc32 = hasher.GetCurrentHash();
                 Array.Reverse(crc32);
