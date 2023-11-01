@@ -145,30 +145,23 @@ namespace LibIRD
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
             // AES decryption
-            using (Aes aes = Aes.Create())
-            {
-                // Validate aes is available
-                if (aes == null)
-                    throw new InvalidOperationException("AES not available. Change your system settings");
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
 
-                // Set AES settings
-                aes.Key = D1AesKey;
-                aes.IV = D1AesIV;
-                aes.Padding = PaddingMode.None;
-                aes.Mode = CipherMode.CBC;
+            // Set AES settings
+            aes.Key = D1AesKey;
+            aes.IV = D1AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
 
-                // Perform AES decryption
-                using (ICryptoTransform decryptor = aes.CreateDecryptor())
-                {
-                    MemoryStream ms = new MemoryStream();
-                    CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Write);
-                    cs.Write(key, 0, 16);
-                    cs.FlushFinalBlock();
-                    Data1Key = ms.ToArray();
-                    ms.Close();
-                    cs.Close();
-                }
-            }
+            // Perform AES decryption
+            using ICryptoTransform decryptor = aes.CreateDecryptor();
+            MemoryStream ms = new();
+            CryptoStream cs = new(ms, decryptor, CryptoStreamMode.Write);
+            cs.Write(key, 0, 16);
+            cs.FlushFinalBlock();
+            Data1Key = ms.ToArray();
+            ms.Close();
+            cs.Close();
         }
 
         /// <summary>
@@ -186,30 +179,23 @@ namespace LibIRD
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
 
             // AES encryption
-            using (Aes aes = Aes.Create())
-            {
-                // Validate aes is available
-                if (aes == null)
-                    throw new InvalidOperationException("AES not available. Change your system settings");
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
 
-                // Set AES settings
-                aes.Key = D2AesKey;
-                aes.IV = D2AesIV;
-                aes.Padding = PaddingMode.None;
-                aes.Mode = CipherMode.CBC;
+            // Set AES settings
+            aes.Key = D2AesKey;
+            aes.IV = D2AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
 
-                // Perform AES encryption
-                using (ICryptoTransform encryptor = aes.CreateEncryptor())
-                {
-                    MemoryStream ms = new MemoryStream();
-                    CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write);
-                    cs.Write(id, 0, 16);
-                    cs.FlushFinalBlock();
-                    Data2Key = ms.ToArray();
-                    ms.Close();
-                    cs.Close();
-                }
-            }
+            // Perform AES encryption
+            using ICryptoTransform encryptor = aes.CreateEncryptor();
+            MemoryStream ms = new();
+            CryptoStream cs = new(ms, encryptor, CryptoStreamMode.Write);
+            cs.Write(id, 0, 16);
+            cs.FlushFinalBlock();
+            Data2Key = ms.ToArray();
+            ms.Close();
+            cs.Close();
         }
 
         #endregion
@@ -270,7 +256,7 @@ namespace LibIRD
                 if (line == null)
                     throw new InvalidDataException("Could not find Disc Key in .getkey.log");
                 // Get Disc Key from log
-                string discKeyStr = line.Substring("disc_key = ".Length);
+                string discKeyStr = line["disc_key = ".Length..];
                 // Validate Disc Key from log
                 if (discKeyStr.Length != 32)
                     throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
@@ -282,12 +268,12 @@ namespace LibIRD
                 if (line == null)
                     throw new InvalidDataException("Could not find Disc ID in .getkey.log");
                 // Get Disc ID from log
-                string discIDStr = line.Substring("disc_id = ".Length);
+                string discIDStr = line["disc_id = ".Length..];
                 // Validate Disc ID from log
                 if (discIDStr.Length != 32)
                     throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
                 // Replace X's in Disc ID with 00000001
-                discIDStr = discIDStr.Substring(0, 24) + "00000001";
+                discIDStr = discIDStr[..24] + "00000001";
                 // Convert Disc ID to byte array
                 discID = Utilities.HexToBytes(discIDStr);
 
@@ -303,7 +289,7 @@ namespace LibIRD
                 if (discPICStr.Length != 256)
                     throw new InvalidDataException("Unexpected PIC in .getkey.log");
                 // Convert PIC to byte array
-                discPIC = Utilities.HexToBytes(discPICStr.Substring(0, 230));
+                discPIC = Utilities.HexToBytes(discPICStr[..230]);
 
                 // Check for warnings in .getkey.log
                 while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
@@ -337,10 +323,10 @@ namespace LibIRD
                 throw new ArgumentNullException(nameof(irdPath));
 
             // Create new stream to write to
-            Stream stream = new MemoryStream();
+            MemoryStream stream = new();
 
             // Write IRD data to stream in order
-            using (BinaryWriter bw = new BinaryWriter(stream, Encoding.UTF8, true))
+            using (BinaryWriter bw = new(stream, Encoding.UTF8, true))
             {
                 // IRD File Signature
                 bw.Write(Magic);
@@ -426,7 +412,7 @@ namespace LibIRD
 
             // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the entire stream
             stream.Position = 0;
-            Crc32 crc32 = new Crc32();
+            Crc32 crc32 = new();
             crc32.Append(stream);
             byte[] crc = crc32.GetCurrentHash();
 
@@ -434,17 +420,13 @@ namespace LibIRD
             stream.Write(crc, 0, 4);
 
             // Create the IRD file stream
-            using (FileStream fs = new FileStream(irdPath, FileMode.Create, FileAccess.Write))
-            {
-                // Create a GZipped IRD file stream
-                using (GZipStream gzStream = new GZipStream(fs, CompressionLevel.Optimal))
-                {
-                    // Write entire gzipped IRD stream to file
-                    stream.Position = 0;
-                    stream.CopyTo(gzStream);
-                    stream.Close();
-                }
-            }
+            using FileStream fs = new(irdPath, FileMode.Create, FileAccess.Write);
+            // Create a GZipped IRD file stream
+            using GZipStream gzStream = new(fs, CompressionLevel.SmallestSize);
+            // Write entire gzipped IRD stream to file
+            stream.Position = 0;
+            stream.CopyTo(gzStream);
+            stream.Close();
         }
 
         #endregion

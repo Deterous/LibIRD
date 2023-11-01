@@ -3,7 +3,6 @@ using DiscUtils.Iso9660;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Text;
 
 namespace LibIRD
@@ -138,7 +137,7 @@ namespace LibIRD
         /// </summary>
         /// <param name="fs"></param>
         /// <param name="reader"></param>
-        private void GetSystemVersion(Stream fs, CDReader reader)
+        private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             
             //DiscUtils.Streams.StreamExtent[] a = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
@@ -205,94 +204,89 @@ namespace LibIRD
                 FileHashes[i] = NullMD5;
 
             // Process ISO file
-            using (Stream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read))
+            using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
+            // Validate ISO file
+            if (!CDReader.Detect(fs))
+                throw new InvalidDataException("Not a valid ISO file");
+
+            // New ISO Reader from DiscUtils
+            CDReader reader = new(fs, true, true);
+
+            // Read PS3 Metadata from PARAM.SFO
+            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
             {
-                // Validate ISO filestream
-                if (fs == null)
-                    throw new ArgumentNullException("Failed to open ISO");
-                if (!CDReader.Detect(fs))
-                    throw new InvalidDataException("Not a valid ISO file");
+                // Parse PARAM.SFO file
+                ParamSFO paramSFO = new(s);
 
-                // New ISO Reader from DiscUtils
-                CDReader reader = new CDReader(fs, true, true);
-
-                // Read PS3 Metadata from PARAM.SFO
-                using (Stream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
-                {
-                    // Parse PARAM.SFO file
-                    ParamSFO paramSFO = new ParamSFO(s);
-
-                    // Store required values for IRD
-                    TitleID = paramSFO["TITLE_ID"];
-                    Title = paramSFO["TITLE"];
-                    GameVersion = paramSFO["VERSION"];
-                    AppVersion = paramSFO["APP_VER"];
-                }
-
-                // Determine system update version
-                GetSystemVersion(fs, reader);
-
-
-                // Determine the extent of the Header (Sector 0 to first data sector)
-                //DiscUtils.Streams.Range<long, long> clusters = reader.PathToClusters("\\").First();
-                //long firstSector = clusters.Offset;
-                //long totalSectors = (long) Math.Ceiling(clusters.Count / 2048.0);
-
-                // Compress the header and store
-                DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
-                long firstSector = sfbClusters[0] != null ? sfbClusters[0].Offset : 0;
-                using (MemoryStream headerStream = new MemoryStream())
-                {
-                    using (GZipStream gzs = new GZipStream(headerStream, CompressionLevel.Optimal))
-                    {
-                        fs.Seek(0, SeekOrigin.Begin);
-                        byte[] buf = new byte[2048];
-                        // Read all sectors before the first data sector
-                        for (int i = 0; i < firstSector; i++)
-                        {
-                            int numBytes = fs.Read(buf, 0, buf.Length);
-                            gzs.Write(buf, 0, numBytes);
-                        }
-                    }
-                    Header = headerStream.ToArray();
-                    HeaderLength = (uint) Header.Length;
-                }
-
-                // Compress the footer and store
-                DiscUtils.Streams.StreamExtent[] updateBytes = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
-                // TODO: check if updateBytes array is not empty?
-                long lastByte = updateBytes[updateBytes.Length - 1].Start + updateBytes[updateBytes.Length - 1].Length;
-                using (MemoryStream footerStream = new MemoryStream())
-                {
-                    using (GZipStream gzs = new GZipStream(footerStream, CompressionLevel.Optimal))
-                    {
-                        // Start saving data from after last file
-                        fs.Seek(lastByte, SeekOrigin.Begin);
-                        byte[] buf = new byte[2048];
-                        int numBytes = 2048;
-                        // Keep reading data until there is none left to read
-                        while (numBytes != 0)
-                        {
-                            numBytes = fs.Read(buf, 0, buf.Length);
-                            gzs.Write(buf, 0, numBytes);
-                        }
-                    }
-                    Footer = footerStream.ToArray();
-                    FooterLength = (uint) Footer.Length;
-                }
-
-
-
-                // Get info on root directory
-                //DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
-                // Recursively process all subdirectories
-                ParseDir(reader, "\\");
-
-                // Calculate last sector
-                //DiscDirectoryInfo lastFile = reader.
-                //lastSector = lastFile.StartSector + lastFile.TotalSectors;
-
+                // Store required values for IRD
+                TitleID = paramSFO["TITLE_ID"];
+                Title = paramSFO["TITLE"];
+                GameVersion = paramSFO["VERSION"];
+                AppVersion = paramSFO["APP_VER"];
             }
+
+            // Determine system update version
+            GetSystemVersion(fs, reader);
+
+
+            // Determine the extent of the Header (Sector 0 to first data sector)
+            //DiscUtils.Streams.Range<long, long> clusters = reader.PathToClusters("\\").First();
+            //long firstSector = clusters.Offset;
+            //long totalSectors = (long) Math.Ceiling(clusters.Count / 2048.0);
+
+            // Compress the header and store
+            DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
+            long firstSector = sfbClusters[0] != null ? sfbClusters[0].Offset : 0;
+            using (MemoryStream headerStream = new())
+            {
+                using (GZipStream gzs = new(headerStream, CompressionLevel.SmallestSize))
+                {
+                    fs.Seek(0, SeekOrigin.Begin);
+                    byte[] buf = new byte[2048];
+                    // Read all sectors before the first data sector
+                    for (int i = 0; i < firstSector; i++)
+                    {
+                        int numBytes = fs.Read(buf, 0, buf.Length);
+                        gzs.Write(buf, 0, numBytes);
+                    }
+                }
+                Header = headerStream.ToArray();
+                HeaderLength = (uint)Header.Length;
+            }
+
+            // Compress the footer and store
+            DiscUtils.Streams.StreamExtent[] updateBytes = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
+            long lastByte = updateBytes[^1].Start + updateBytes[^1].Length;
+            using (MemoryStream footerStream = new())
+            {
+                using (GZipStream gzs = new(footerStream, CompressionLevel.SmallestSize))
+                {
+                    // Start saving data from after last file
+                    fs.Seek(lastByte, SeekOrigin.Begin);
+                    byte[] buf = new byte[2048];
+                    int numBytes = 2048;
+                    // Keep reading data until there is none left to read
+                    while (numBytes != 0)
+                    {
+                        numBytes = fs.Read(buf, 0, buf.Length);
+                        gzs.Write(buf, 0, numBytes);
+                    }
+                }
+                Footer = footerStream.ToArray();
+                FooterLength = (uint)Footer.Length;
+            }
+
+
+
+            // Get info on root directory
+            //DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
+            // Recursively process all subdirectories
+            ParseDir(reader, "\\");
+
+            // Calculate last sector
+            //DiscDirectoryInfo lastFile = reader.
+            //lastSector = lastFile.StartSector + lastFile.TotalSectors;
+
         }
     }
 }
