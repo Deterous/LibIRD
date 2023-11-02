@@ -90,7 +90,7 @@ namespace LibIRD
         private void GeneratePIC(long size, long layerbreak = BDLayerSize, bool exactIRD = false)
         {
             // Validate size
-            if (size == 0 || (size % 2048) != 0)
+            if (size == 0 || (size % SectorSize) != 0)
                 throw new ArgumentException("ISO Size in bytes must be a positive integer multiple of 2048", nameof(size));
             // Validate layerbreak
             if (layerbreak == 0 || (layerbreak != BDLayerSize && layerbreak >= size))
@@ -100,7 +100,7 @@ namespace LibIRD
             if (size > BDLayerSize) // if BD-50
             {
                 // num_sectors + layer_sector_end (0x00100000) + sectors_between_layers (0x01358C00 - 0x00CA73FE) - 3
-                byte[] total_sectors = BitConverter.GetBytes((uint)(size / 2048 + 8067071));
+                byte[] total_sectors = BitConverter.GetBytes((uint)(size / SectorSize + 8067071));
 
                 // Initial portion of PIC (24 bytes)
                 PIC = new byte[]{
@@ -138,9 +138,9 @@ namespace LibIRD
             else // if BD-25
             {
                 // Total sectors used on disc: num_sectors + layer_sector_end (0x00100000) - 1
-                byte[] total_sectors = BitConverter.GetBytes((uint)(size / 2048 + 1048575));
+                byte[] total_sectors = BitConverter.GetBytes((uint)(size / SectorSize + 1048575));
                 // Layer sector end location: num_sectors + layer_sector_end (0x00100000) - 2
-                byte[] end_sector = BitConverter.GetBytes((uint)(size / 2048 + 1048574));
+                byte[] end_sector = BitConverter.GetBytes((uint)(size / SectorSize + 1048574));
 
                 // Initial portion of PIC (24 bytes)
                 PIC = new byte[]{ 0x10, 0x02, 0x00, 0x00, 0x44, 0x49, 0x01, 0x08, 0x00, 0x00, 0x20, 0x00,

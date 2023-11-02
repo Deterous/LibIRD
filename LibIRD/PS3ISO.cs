@@ -3,6 +3,7 @@ using DiscUtils.Iso9660;
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace LibIRD
@@ -13,6 +14,12 @@ namespace LibIRD
     public class PS3ISO
     {
         #region Constants
+
+        /// <summary>
+        /// Blu-ray ISO sector size in bytes
+        /// </summary>
+        /// <remarks>2048</remarks>
+        private protected static readonly uint SectorSize = 2048;
 
         /// <summary>
         /// MD5 hash of null
@@ -101,7 +108,26 @@ namespace LibIRD
         /// <remarks><see cref="FileHashes"/> files, 16-bytes per hash, alternating with each <see cref="FileHashes"/> entry</remarks>
         public byte[][] FileHashes { get; private protected set; }
 
+        /// <summary>
+        /// First byte of the PS3_DISC.SFB file
+        /// </summary>
+        /// <remarks>Last byte to read when reading the header</remarks>
+        private long FirstDataSector { get; set; }
+
+        /// <summary>
+        /// First byte of the PS3UPDAT.PUP file
+        /// </summary>
+        private long UpdateOffset { get; set; }
+
+        /// <summary>
+        /// Last byte of the PS3UPDAT.PUP file
+        /// </summary>
+        /// <remarks>Offset to use when reading the footer</remarks>
+        private long UpdateEnd { get; set; }
+
         #endregion
+
+        #region Constructors
 
         /// <summary>
         /// Constructor for generating values from an ISO file
@@ -122,17 +148,6 @@ namespace LibIRD
                 throw new FileNotFoundException(isoPath);
 
             // TODO: remove these initial values once they're set properly
-            RegionCount = 3;
-            RegionHashes = new byte[RegionCount][];
-            for (int i = 0; i < RegionCount; i++)
-                RegionHashes[i] = NullMD5;
-            FileCount = 13;
-            FileKeys = new ulong[FileCount];
-            for (int i = 0; i < FileCount; i++)
-                FileKeys[i] = 0;
-            FileHashes = new byte[FileCount][];
-            for (int i = 0; i < FileCount; i++)
-                FileHashes[i] = NullMD5;
 
             // Parse ISO file as a file stream
             using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
@@ -162,41 +177,25 @@ namespace LibIRD
             GetHeader(fs, reader);
 
             // Read the ISO footer
-            GetFooter(fs, reader);
+            GetFooter(fs);
 
-            // Recursively process all directories and files in ISO
-            ParseDir(reader, "\\");
+            // Process all regions on ISO
+            HashRegions(fs);
+
+            // Recursively process all files in ISO
+            FileCount = 0;
+            FileKeys = new ulong[99];
+            FileHashes = new byte[99][];
+            ProcessFiles(reader, "\\");
+            for (int i = 0; i < FileCount; i++)
+                FileKeys[i] = 0;
+            for (int i = 0; i < FileCount; i++)
+                FileHashes[i] = NullMD5;
         }
 
-        /// <summary>
-        /// Process all files and subdirectories recursively
-        /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="path"></param>
-        private void ParseDir(CDReader reader, string path)
-        {
-            // Process current directory
-            DiscDirectoryInfo dir = reader.GetDirectoryInfo(path);
+        #endregion
 
-            // Process all files in current directory
-            foreach (DiscFileInfo fileInfo in dir.GetFiles())
-            {
-                // Save directory full path
-                // Save offset
-                // Save start sector (offset)
-                // Save total sectors (count)
-            }
-
-            // Recursively process all subfolders of current directory
-            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
-            {
-                // Save directory full path
-                // Save offset
-                // Save start sector (offset)
-                // Save total sectors (count)
-                ParseDir(reader, dirInfo.FullName);
-            }
-        }
+        #region Methods
 
         /// <summary>
         /// Retreives and stores the system version
@@ -208,7 +207,6 @@ namespace LibIRD
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             // Determine PUP file offset via cluster
-            long pupOffset;
             DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
             if (updateClusters == null || updateClusters.Length <= 0)
             {
@@ -216,16 +214,21 @@ namespace LibIRD
                 DiscUtils.Streams.StreamExtent[] updateExtents = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
                 if (updateExtents == null || updateExtents.Length <= 0)
                     throw new InvalidDataException("Unexpected PS3UPDAT.PUP file extent in ISO filestream");
-                pupOffset = updateExtents[0].Start;
+                // PS3UPDAT.PUP file begins at start of first extent
+                UpdateOffset = updateExtents[0].Start;
+                // Update file ends at the last extent plus its length
+                UpdateEnd = updateExtents[^1].Start + updateExtents[^1].Length;
             }
             else
             {
                 // PS3UPDAT.PUP file begins at first byte of dedicated cluster
-                pupOffset = updateClusters[0] != null ? 2048 * updateClusters[0].Offset : 0;
+                UpdateOffset = updateClusters[0] != null ? SectorSize * updateClusters[0].Offset : 0;
+                // Update file ends at the last byte of the last cluster
+                UpdateEnd = SectorSize * (updateClusters[^1].Offset + updateClusters[^1].Count);
             }
 
             // Check PUP file Magic
-            fs.Seek(pupOffset, SeekOrigin.Begin);
+            fs.Seek(UpdateOffset, SeekOrigin.Begin);
             byte[] pupMagic = new byte[5];
             fs.Read(pupMagic, 0, pupMagic.Length);
             // If magic is incorrect, set version to "0000" (unknown)
@@ -234,13 +237,13 @@ namespace LibIRD
             else
             {
                 // Determine location of version string
-                fs.Seek(pupOffset + 0x3E, SeekOrigin.Begin);
+                fs.Seek(UpdateOffset + 0x3E, SeekOrigin.Begin);
                 byte[] offset = new byte[2];
                 fs.Read(offset, 0, 2);
                 // Move stream to PUP version string
                 Array.Reverse(offset);
                 ushort versionOffset = BitConverter.ToUInt16(offset, 0);
-                fs.Seek(pupOffset + versionOffset, SeekOrigin.Begin);
+                fs.Seek(UpdateOffset + versionOffset, SeekOrigin.Begin);
                 // Read version string
                 byte[] version = new byte[4];
                 fs.Read(version, 0, version.Length);
@@ -256,8 +259,7 @@ namespace LibIRD
         /// <param name="reader"></param>
         private void GetHeader(FileStream fs, CDReader reader)
         {
-            // Determine the extent of the geader via cluster (Sector 0 to first data sector)
-            long firstSector;
+            // Determine the extent of the header via cluster (Sector 0 to first data sector)
             DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
             if (sfbClusters == null || sfbClusters.Length <= 0)
             {
@@ -265,12 +267,12 @@ namespace LibIRD
                 DiscUtils.Streams.StreamExtent[] sfbExtents = reader.PathToExtents("\\PS3_DISC.SFB");
                 if (sfbExtents == null || sfbExtents.Length <= 0)
                     throw new InvalidDataException("Unexpected PS3UPDAT.PUP file extent in ISO filestream");
-                firstSector = sfbExtents[0].Start;
+                FirstDataSector = sfbExtents[0].Start;
             }
             else
             {
                 // End of header is at beginning of first byte of dedicated cluster
-                firstSector = sfbClusters[0] != null ? sfbClusters[0].Offset : 0;
+                FirstDataSector = sfbClusters[0] != null ? sfbClusters[0].Offset : 0;
             }
 
             // Begin a GZip stream to write header to
@@ -279,11 +281,11 @@ namespace LibIRD
             {
                 // Start reading data from the beginning of the ISO file
                 fs.Seek(0, SeekOrigin.Begin);
-                byte[] buf = new byte[2048];
+                byte[] buf = new byte[SectorSize];
                 int numBytes;
 
                 // Read all data before the first data sector
-                for (int i = 0; i < firstSector; i++)
+                for (int i = 0; i < FirstDataSector; i++)
                 {
                     numBytes = fs.Read(buf, 0, buf.Length);
                     gzs.Write(buf, 0, numBytes);
@@ -300,33 +302,16 @@ namespace LibIRD
         /// </summary>
         /// <param name="fs">ISO filestream</param>
         /// <param name="reader"></param>
-        private void GetFooter(FileStream fs, CDReader reader)
+        private void GetFooter(FileStream fs)
         {
-            // Determine the extent of the footer via cluster (After last data byte to last ISO sector)
-            long lastByte;
-            DiscUtils.Streams.StreamExtent[] updateBytes = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
-            if (updateBytes == null || updateBytes.Length <= 0)
-            {
-                // File too small for dedicated cluster, try get the last byte from the file extents instead
-                DiscUtils.Streams.StreamExtent[] updateExtents = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
-                if (updateExtents == null || updateExtents.Length <= 0)
-                    throw new InvalidDataException("Unexpected PS3UPDAT.PUP file extent in ISO filestream");
-                lastByte = updateExtents[^1].Start + updateExtents[^1].Length;
-            }
-            else
-            {
-                // Start of footer is after last byte of dedicated cluster
-                lastByte = updateBytes[^1].Start + updateBytes[^1].Length;
-            }
-
             // Begin a GZip stream to write footer to
             using MemoryStream footerStream = new();
             using (GZipStream gzs = new(footerStream, CompressionLevel.SmallestSize))
             {
                 // Start reading data from after last file
-                fs.Seek(lastByte, SeekOrigin.Begin);
-                byte[] buf = new byte[2048];
-                int numBytes = 2048;
+                fs.Seek(UpdateEnd, SeekOrigin.Begin);
+                byte[] buf = new byte[SectorSize];
+                int numBytes = (int)SectorSize;
 
                 // Keep reading data until there is none left to read
                 while (numBytes != 0)
@@ -340,5 +325,109 @@ namespace LibIRD
             Footer = footerStream.ToArray();
             FooterLength = (uint)Footer.Length;
         }
+
+        private void HashRegions(FileStream fs)
+        {
+            // Determine the number of unencryted regions
+            fs.Seek(0, SeekOrigin.Begin);
+            byte[] decRegionCount = new byte[4];
+            fs.Read(decRegionCount, 0, 4);
+
+            // Total number of regions is 2x number of unencrypted regions, minus 1
+            RegionCount = (byte)(2 * ((uint)decRegionCount[3]) - 1);
+            if (RegionCount <= 0)
+                throw new InvalidDataException("No regions detected in ISO");
+            RegionHashes = new byte[RegionCount][];
+
+            // Determine the extent for each region
+            byte[] regionSector = new byte[4];
+            long[] startSector = new long[RegionCount];
+            long[] endSector = new long[RegionCount];
+            fs.Seek(8, SeekOrigin.Begin);
+            fs.Read(regionSector, 0, 4);
+            Array.Reverse(regionSector, 0, 4);
+            for (int i = 0; i < RegionCount; i++)
+            {
+                // End sector of previous region is start of this region
+                if (i % 2 == 1)
+                    startSector[i] = BitConverter.ToInt32(regionSector) + 1;
+                else
+                    startSector[i] = BitConverter.ToInt32(regionSector);
+                // Determine end sector offset of this region
+                fs.Read(regionSector, 0, 4);
+                Array.Reverse(regionSector, 0, 4);
+                if (i % 2 == 1)
+                    endSector[i] = BitConverter.ToInt32(regionSector) - 1;
+                else
+                    endSector[i] = BitConverter.ToInt32(regionSector);
+            }
+
+            // Remove header from first region
+            startSector[0] = FirstDataSector;
+            // Remove footer from last region
+            endSector[^1] = (UpdateEnd / SectorSize) - 1;
+
+            // Determine MD5 hashes for each region
+            using MD5 md5 = MD5.Create();
+            byte[] buf = new byte[SectorSize];
+            for (int i = 0; i < RegionCount; i++)
+            {
+                // Start reading data from first sector of region
+                fs.Seek(SectorSize * startSector[i], SeekOrigin.Begin);
+
+                // Compute MD5 hash for just the region portion of the ISO file
+                int numBytes;
+                for (long j = startSector[i]; j <= endSector[i]; j++)
+                {
+                    // Read one sector at a time
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    // Check that an entire sector was read
+                    if (numBytes < buf.Length)
+                        throw new InvalidDataException("Disc region ended unexpectedly");
+                    // Process MD5 sum one sector at a time
+                    md5.TransformBlock(buf, 0, buf.Length, null, 0);
+                }
+
+                // Compute and store MD5 hash of region
+                md5.TransformFinalBlock(buf, 0, 0);
+                RegionHashes[i] = md5.Hash;
+            }
+        }
+
+        /// <summary>
+        /// Process all files and files within subdirectories recursively
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="path"></param>
+        private void ProcessFiles(CDReader reader, string path)
+        {
+            // Process current directory
+            DiscDirectoryInfo dir = reader.GetDirectoryInfo(path);
+
+            // Process all files in current directory
+            foreach (DiscFileInfo fileInfo in dir.GetFiles())
+            {
+                FileKeys[FileCount] = 0;
+                FileHashes[FileCount] = NullMD5;
+                FileCount += 1;
+                // Save directory full path
+                // Save offset
+                // Save start sector (offset)
+                // Save total sectors (count)
+            }
+
+            // Recursively process all subfolders of current directory
+            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
+            {
+                // Save directory full path
+                // Save offset
+                // Save start sector (offset)
+                // Save total sectors (count)
+                ProcessFiles(reader, dirInfo.FullName);
+            }
+        }
+
+        #endregion
+
     }
 }
