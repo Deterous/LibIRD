@@ -108,7 +108,7 @@ namespace LibIRD
                     _data2Key = value;
                 else
                     throw new ArgumentException("Data 2 Key must be a byte array of length 16", nameof(value));
-}
+            }
         }
         private byte[] _data2Key;
 
@@ -136,6 +136,48 @@ namespace LibIRD
         #endregion
 
         #region Constructors
+
+        /// <summary>
+        /// Manual constructor
+        /// </summary>
+        private protected IRD(
+            byte version,
+            string titleID,
+            string title,
+            string sysVersion,
+            string gameVersion,
+            string appVersion,
+            byte[] header,
+            byte[] footer,
+            byte[][] regionHashes,
+            ulong[] fileKeys,
+            byte[][] fileHashes,
+            uint uid,
+            ushort extraConfig,
+            ushort attachments,
+            byte[] d1,
+            byte[] d2,
+            byte[] pic)
+            : base(
+                titleID,
+                title,
+                sysVersion,
+                gameVersion,
+                appVersion,
+                header,
+                footer,
+                regionHashes,
+                fileKeys,
+                fileHashes)
+        {
+            Version = version;
+            UID = uid;
+            ExtraConfig = extraConfig;
+            Attachments = attachments;
+            Data1Key = d1;
+            Data2Key = d2;
+            PIC = pic;
+        }
 
         /// <summary>
         /// Default constructor for internal derived classes only: resulting object not in usable state
@@ -313,6 +355,59 @@ namespace LibIRD
 
             // Save encrypted key to field
             Data2Key = stream.ToArray();
+        }
+
+        /// <summary>
+        /// Read and store IRD data from an existing file
+        /// </summary>
+        /// <param name="irdPath">Path to the IRD file</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        public static IRD Read(string irdPath)
+        {
+            // Validate irdPath
+            if (irdPath == null || irdPath.Length <= 0)
+                throw new ArgumentNullException(nameof(irdPath));
+            if (!File.Exists(irdPath))
+                throw new FileNotFoundException(nameof(irdPath));
+
+            byte version = 1;
+            string titleID = "BCES01234";
+            string title = "R";
+            string sysVersion = "0.00";
+            string gameVersion = "00.00";
+            string appVersion = "00.00";
+            byte[] header = new byte[1];
+            byte[] footer = new byte[1];
+            byte[][] regionHashes = new byte[1][];
+            regionHashes[0] = new byte[1];
+            ulong[] fileKeys = new ulong[1];
+            byte[][] fileHashes = new byte[1][];
+            fileHashes[0] = new byte[1];
+            uint uid = 1;
+            ushort extraConfig = 1;
+            ushort attachments = 1;
+            byte[] d1 = new byte[16];
+            byte[] d2 = new byte[16];
+            byte[] pic = new byte[115];
+
+            return new IRD(version,
+                           titleID,
+                           title,
+                           sysVersion,
+                           gameVersion,
+                           appVersion,
+                           header,
+                           footer,
+                           regionHashes,
+                           fileKeys,
+                           fileHashes,
+                           uid,
+                           extraConfig,
+                           attachments,
+                           d1,
+                           d2,
+                           pic);
         }
 
         /// <summary>

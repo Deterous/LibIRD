@@ -47,7 +47,7 @@ namespace LibIRD
     #endregion
 
     /// <summary>
-    /// Create Reproducible Redump-style IRD file from an ISO, CRC32 and Disc Key
+    /// Create a reproducible, redump-style IRD file from an ISO and a Disc Key
     /// </summary>
     public class ReIRD : IRD
     {
@@ -201,7 +201,7 @@ namespace LibIRD
             // Check file exists
             var iso = new FileInfo(isoPath);
             if (!iso.Exists)
-                throw new FileNotFoundException(isoPath);
+                throw new FileNotFoundException(nameof(isoPath));
 
             // Calculate size of ISO
             long size = iso.Length;
@@ -220,12 +220,12 @@ namespace LibIRD
             byte[] pic = PIC;
             GeneratePIC(size);
             // Check that GetKey log matches expected PIC
-            if (!((ReadOnlySpan<byte>) PIC).SequenceEqual(pic))
+            if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");
         }
 
         /// <summary>
-        /// Constructor with additional region to generate a specific Disc ID
+        /// Constructor with optional additional region to generate a specific Disc ID
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
