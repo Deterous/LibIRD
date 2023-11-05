@@ -155,7 +155,9 @@ namespace LibIRD
             Header = header;
             FooterLength = (uint)footer.Length;
             Footer = footer;
+            RegionCount = (byte) regionHashes.Length;
             RegionHashes = regionHashes;
+            FileCount = (uint)fileKeys.Length;
             FileKeys = fileKeys;
             FileHashes = fileHashes;
         }

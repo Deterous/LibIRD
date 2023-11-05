@@ -152,12 +152,12 @@ namespace LibIRD
             byte[][] regionHashes,
             ulong[] fileKeys,
             byte[][] fileHashes,
-            uint uid,
             ushort extraConfig,
             ushort attachments,
             byte[] d1,
             byte[] d2,
-            byte[] pic)
+            byte[] pic,
+            uint uid)
             : base(
                 titleID,
                 title,
@@ -171,12 +171,12 @@ namespace LibIRD
                 fileHashes)
         {
             Version = version;
-            UID = uid;
             ExtraConfig = extraConfig;
             Attachments = attachments;
             Data1Key = d1;
             Data2Key = d2;
             PIC = pic;
+            UID = uid;
         }
 
         /// <summary>
@@ -358,59 +358,6 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Read and store IRD data from an existing file
-        /// </summary>
-        /// <param name="irdPath">Path to the IRD file</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="FileNotFoundException"></exception>
-        public static IRD Read(string irdPath)
-        {
-            // Validate irdPath
-            if (irdPath == null || irdPath.Length <= 0)
-                throw new ArgumentNullException(nameof(irdPath));
-            if (!File.Exists(irdPath))
-                throw new FileNotFoundException(nameof(irdPath));
-
-            byte version = 1;
-            string titleID = "BCES01234";
-            string title = "R";
-            string sysVersion = "0.00";
-            string gameVersion = "00.00";
-            string appVersion = "00.00";
-            byte[] header = new byte[1];
-            byte[] footer = new byte[1];
-            byte[][] regionHashes = new byte[1][];
-            regionHashes[0] = new byte[1];
-            ulong[] fileKeys = new ulong[1];
-            byte[][] fileHashes = new byte[1][];
-            fileHashes[0] = new byte[1];
-            uint uid = 1;
-            ushort extraConfig = 1;
-            ushort attachments = 1;
-            byte[] d1 = new byte[16];
-            byte[] d2 = new byte[16];
-            byte[] pic = new byte[115];
-
-            return new IRD(version,
-                           titleID,
-                           title,
-                           sysVersion,
-                           gameVersion,
-                           appVersion,
-                           header,
-                           footer,
-                           regionHashes,
-                           fileKeys,
-                           fileHashes,
-                           uid,
-                           extraConfig,
-                           attachments,
-                           d1,
-                           d2,
-                           pic);
-        }
-
-        /// <summary>
         /// Write IRD data to file
         /// </summary>
         /// <param name="irdPath">Path to the ISO</param>
@@ -525,6 +472,119 @@ namespace LibIRD
             // Write entire gzipped IRD stream to file
             stream.Position = 0;
             stream.CopyTo(gzStream);
+        }
+
+        /// <summary>
+        /// Read and store IRD data from an existing file
+        /// </summary>
+        /// <param name="irdPath">Path to the IRD file</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        public static IRD Read(string irdPath)
+        {
+            // Validate irdPath
+            if (irdPath == null || irdPath.Length <= 0)
+                throw new ArgumentNullException(nameof(irdPath));
+            if (!File.Exists(irdPath))
+                throw new FileNotFoundException(nameof(irdPath));
+
+            // Open IRD for reading
+            using FileStream fs = new(irdPath, FileMode.Open, FileAccess.Read);
+            using GZipStream gzs = new(fs, CompressionMode.Decompress);
+            using BinaryReader br = new(gzs);
+
+            // Check for IRD file signature
+            byte[] magic = br.ReadBytes(4);
+            if (!((ReadOnlySpan<byte>)Magic).SequenceEqual(magic))
+                throw new InvalidDataException("IRD file not recognised");
+
+            // Read file version
+            byte version = br.ReadByte();
+            if (version < 6 || version > 9)
+                throw new InvalidDataException("Unsupported IRD version detected");
+
+            // Read Title ID and Title
+            string titleID = Encoding.ASCII.GetString(br.ReadBytes(9));
+            string title = br.ReadString();
+
+            // Read System, Game, and App Version
+            string sysVersion = Encoding.ASCII.GetString(br.ReadBytes(4));
+            string gameVersion = Encoding.ASCII.GetString(br.ReadBytes(5));
+            string appVersion = Encoding.ASCII.GetString(br.ReadBytes(5));
+
+            // Read UID (for Version 7)
+            uint uid = 0;
+            if (version == 7)
+                uid = br.ReadUInt32();
+
+            // Read Header
+            uint headerLength = br.ReadUInt32();
+            byte[] header = new byte[headerLength];
+            br.Read(header, 0, header.Length);
+
+            // Read Footer
+            uint footerLength = br.ReadUInt32();
+            byte[] footer = new byte[footerLength];
+            br.Read(footer, 0, footer.Length);
+
+            // Read region hashes
+            byte regionCount = br.ReadByte();
+            byte[][] regionHashes = new byte[regionCount][];
+            for (int i = 0; i < regionCount; i++)
+                regionHashes[i] = br.ReadBytes(16);
+
+            // Read file hashes
+            uint fileCount = br.ReadUInt32();
+            ulong[] fileKeys = new ulong[fileCount];
+            byte[][] fileHashes = new byte[fileCount][];
+            for (int i = 0; i  < fileCount; i++)
+            {
+                fileKeys[i] = br.ReadUInt64();
+                fileHashes[i] = br.ReadBytes(16);
+            }
+
+            // Read extra config and number of attachments
+            ushort extraConfig = br.ReadUInt16();
+            ushort attachments = br.ReadUInt16();
+
+            // Read PIC data (for Version 8 and prior)
+            byte[] pic = new byte[115];
+            if (version >= 9)
+                pic = br.ReadBytes(115);
+
+            // Read Data 1 Key, Data 2 Key
+            byte[] d1 = br.ReadBytes(16);
+            byte[] d2 = br.ReadBytes(16);
+
+            // Read PIC data (for Version 8 and prior)
+            if (version < 9)
+                pic = br.ReadBytes(115);
+
+            // Read UID (for Version 8 onwards)
+            if (version > 7)
+                uid = br.ReadUInt16();
+
+            // Read and CRC32 hash
+            byte[] crc = br.ReadBytes(4);
+
+            // Create new IRD object with read parameters
+            return new IRD(version,
+                           titleID,
+                           title,
+                           sysVersion,
+                           gameVersion,
+                           appVersion,
+                           header,
+                           footer,
+                           regionHashes,
+                           fileKeys,
+                           fileHashes,
+                           extraConfig,
+                           attachments,
+                           d1,
+                           d2,
+                           pic,
+                           uid);
         }
 
         #endregion
