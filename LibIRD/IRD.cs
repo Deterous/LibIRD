@@ -131,10 +131,6 @@ namespace LibIRD
 
         #endregion
 
-        #region Helper Functions
-
-        #endregion
-
         #region Constructors
 
         /// <summary>
@@ -150,7 +146,7 @@ namespace LibIRD
             byte[] header,
             byte[] footer,
             byte[][] regionHashes,
-            ulong[] fileKeys,
+            long[] fileKeys,
             byte[][] fileHashes,
             ushort extraConfig,
             ushort attachments,
@@ -535,11 +531,11 @@ namespace LibIRD
 
             // Read file hashes
             uint fileCount = br.ReadUInt32();
-            ulong[] fileKeys = new ulong[fileCount];
+            long[] fileKeys = new long[fileCount];
             byte[][] fileHashes = new byte[fileCount][];
             for (int i = 0; i  < fileCount; i++)
             {
-                fileKeys[i] = br.ReadUInt64();
+                fileKeys[i] = br.ReadInt64();
                 fileHashes[i] = br.ReadBytes(16);
             }
 

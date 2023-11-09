@@ -1,7 +1,6 @@
 ﻿using LibIRD;
 using System;
 using System.IO;
-using System.IO.Enumeration;
 using System.Text;
 
 namespace BuildIRD

@@ -92,15 +92,15 @@ namespace LibIRD
         public byte[][] RegionHashes { get; private protected set; }
 
         /// <summary>
-        /// Number of decrypted files in the image
+        /// Number of files in the image
         /// </summary>
         public uint FileCount { get; private protected set; }
 
         /// <summary>
-        /// Starting sector for each decrypted file
+        /// Starting sector for each file
         /// </summary>
         /// <remarks><see cref="FileCount"/> files, alternating with each <see cref="FileHashes"/> entry</remarks>
-        public ulong[] FileKeys { get; private protected set; }
+        public long[] FileKeys { get; private protected set; }
 
         /// <summary>
         /// MD5 hashes for all decrypted files in the image
@@ -125,8 +125,15 @@ namespace LibIRD
         /// <remarks>Offset to use when reading the footer</remarks>
         private long UpdateEnd { get; set; }
 
-        private long[] FileStart { get; set; }
-        private long[] FileEnd { get; set; }
+        /// <summary>
+        /// First sector of each region
+        /// </summary>
+        private long[] RegionStart { get; set; }
+
+        /// <summary>
+        /// Last sector of each region
+        /// </summary>
+        private long[] RegionEnd { get; set; }
 
         #endregion
 
@@ -143,7 +150,7 @@ namespace LibIRD
                                  byte[] header,
                                  byte[] footer,
                                  byte[][] regionHashes,
-                                 ulong[] fileKeys,
+                                 long[] fileKeys,
                                  byte[][] fileHashes)
         {
             TitleID = titleID;
@@ -212,29 +219,25 @@ namespace LibIRD
             // Read and compress the ISO footer
             GetFooter(fs);
 
-            // Recursively count all files in ISO to allocate arrays
+            // Process all regions on ISO
+            HashRegions(fs);
+
+            // TODO: Speed up program by hashing regions and files at the same time (read from filesystem only once)
+
+            // Recursively count all files in ISO to allocate file arrays
             DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
             FileCount = 0;
             CountFiles(rootDir);
-            FileStart = new long[FileCount];
-            FileEnd = new long[FileCount];
-            FileKeys = new ulong[FileCount];
+            FileKeys = new long[FileCount];
             FileHashes = new byte[FileCount][];
 
             // Determine file offsets and hashes
             uint fileCount = FileCount;
             FileCount = 0;
-            GetFileExtents(rootDir, reader);
+            ProcessFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
                 throw new InvalidFileSystemException("Unexpected ISO filesystem error: ");
-
-            // Get MD5 hash for all regions and files on ISO
-            HashData(fs);
-            for (int i = 0; i < FileCount; i++)
-            {
-                FileKeys[i] = (ulong)FileStart[i];
-                FileHashes[i] = NullMD5;
-            }
+            Array.Sort(FileKeys, FileHashes);
         }
 
         #endregion
@@ -375,7 +378,7 @@ namespace LibIRD
         /// </summary>
         /// <param name="fs"></param>
         /// <exception cref="InvalidFileSystemException"></exception>
-        private void HashData(FileStream fs)
+        private void HashRegions(FileStream fs)
         {
             // Determine the number of unencryted regions
             fs.Seek(0, SeekOrigin.Begin);
@@ -387,11 +390,11 @@ namespace LibIRD
             if (RegionCount <= 0)
                 throw new InvalidFileSystemException("No regions detected in ISO");
             RegionHashes = new byte[RegionCount][];
+            RegionStart = new long[RegionCount];
+            RegionEnd = new long[RegionCount];
 
             // Determine the extent for each region
             byte[] regionSector = new byte[4];
-            long[] regionStart = new long[RegionCount];
-            long[] regionEnd = new long[RegionCount];
             fs.Seek(8, SeekOrigin.Begin);
             fs.Read(regionSector, 0, 4);
             Array.Reverse(regionSector, 0, 4);
@@ -399,22 +402,22 @@ namespace LibIRD
             {
                 // End sector of previous region is start of this region
                 if (i % 2 == 1)
-                    regionStart[i] = BitConverter.ToInt32(regionSector) + 1;
+                    RegionStart[i] = BitConverter.ToInt32(regionSector) + 1;
                 else
-                    regionStart[i] = BitConverter.ToInt32(regionSector);
+                    RegionStart[i] = BitConverter.ToInt32(regionSector);
                 // Determine end sector offset of this region
                 fs.Read(regionSector, 0, 4);
                 Array.Reverse(regionSector, 0, 4);
                 if (i % 2 == 1)
-                    regionEnd[i] = BitConverter.ToInt32(regionSector) - 1;
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector) - 1;
                 else
-                    regionEnd[i] = BitConverter.ToInt32(regionSector);
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector);
             }
 
             // Remove header from first region
-            regionStart[0] = FirstDataSector;
+            RegionStart[0] = FirstDataSector;
             // Remove footer from last region
-            regionEnd[^1] = (UpdateEnd / SectorSize) - 1;
+            RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
 
             // Determine MD5 hashes for each region
             using MD5 md5 = MD5.Create();
@@ -422,11 +425,11 @@ namespace LibIRD
             for (int i = 0; i < RegionCount; i++)
             {
                 // Start reading data from first sector of region
-                fs.Seek(SectorSize * regionStart[i], SeekOrigin.Begin);
+                fs.Seek(SectorSize * RegionStart[i], SeekOrigin.Begin);
 
                 // Compute MD5 hash for just the region portion of the ISO file
                 int numBytes;
-                for (long j = regionStart[i]; j <= regionEnd[i]; j++)
+                for (long j = RegionStart[i]; j <= RegionEnd[i]; j++)
                 {
                     // Read one sector at a time
                     numBytes = fs.Read(buf, 0, buf.Length);
@@ -444,23 +447,11 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Recursively determines file count
-        /// </summary>
-        /// <param name="dir"></param>
-        private void CountFiles(DiscDirectoryInfo dir)
-        {
-            FileCount += (uint)dir.GetFiles().Length;
-            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
-                CountFiles(dirInfo);
-        }
-
-        /// <summary>
-        /// Determine byte extents for all files and files within subdirectories recursively
+        /// Determine and store hashes for all files and files within subdirectories recursively
         /// </summary>
         /// <param name="reader"></param>
-        /// <param name="dir"></param>
-        /// <exception cref="InvalidFileSystemException"></exception>
-        private void GetFileExtents(DiscDirectoryInfo dir, CDReader reader)
+        /// <param name="path"></param>
+        private void ProcessFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
         {
             // Process all files in current directory
             foreach (DiscFileInfo fileInfo in dir.GetFiles())
@@ -472,16 +463,72 @@ namespace LibIRD
                     throw new InvalidFileSystemException("Unexpected file extent in ISO filestream for " + filePath);
                 if (fileExtents.Length > 1)
                     throw new InvalidFileSystemException("Non-contiguous file detected");
-                FileStart[FileCount] = fileExtents[0].Start;
-                FileEnd[FileCount] = fileExtents[0].Length;
+                long firstByte = fileExtents[0].Start;
+                long fileLength = fileExtents[0].Length;
+                FileKeys[FileCount] = firstByte / 2048;
+
+                // Determine whether file is in encrypted or decrypted region
+                bool encrypted = false;
+                for (int i = RegionCount - 1; i > 0; i--)
+                {
+                    if (RegionStart[i] <= firstByte / 2048)
+                    {
+                        encrypted = i % 2 == 1;
+                        break;
+                    }
+                }
+
+                // Decrypt file if encrypted
+                if (encrypted)
+                {
+                    FileHashes[FileCount] = NullMD5;
+                    FileCount++;
+                    continue;
+                }
+
+                // Start reading data from the beginning of the ISO file
+                fs.Seek(firstByte, SeekOrigin.Begin);
+                byte[] buf = new byte[SectorSize];
+                int numBytes;
+                // Read all data before the first data sector
+                MD5 md5 = MD5.Create();
+                for (long i = 0; i < (fileLength / SectorSize); i++)
+                {
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    // Check that an entire sector was read
+                    if (numBytes < buf.Length)
+                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                    md5.TransformBlock(buf, 0, numBytes, null, 0);
+                }
+                // Read remaining partial sector
+                if (fileLength % SectorSize != 0)
+                {
+                    numBytes = fs.Read(buf, 0, (int)(fileLength % SectorSize));
+                    md5.TransformBlock(buf, 0, numBytes, null, 0);
+                }
+
+                // Finalise and store MD5 hash
+                md5.TransformFinalBlock(buf, 0, 0);
+                FileHashes[FileCount] = md5.Hash;
                 FileCount++;
             }
 
             // Recursively process all subfolders of current directory
             foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
             {
-                GetFileExtents(dirInfo, reader);
+                ProcessFiles(fs, reader, dirInfo);
             }
+        }
+
+        /// <summary>
+        /// Recursively determines file count
+        /// </summary>
+        /// <param name="dir"></param>
+        private void CountFiles(DiscDirectoryInfo dir)
+        {
+            FileCount += (uint)dir.GetFiles().Length;
+            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
+                CountFiles(dirInfo);
         }
 
         #endregion
