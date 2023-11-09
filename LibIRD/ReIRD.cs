@@ -194,31 +194,19 @@ namespace LibIRD
         /// <exception cref="InvalidDataException"></exception>
         public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog)
         {
-            // Validate ISO path
-            if (isoPath == null || isoPath.Length <= 0)
-                throw new ArgumentNullException(nameof(isoPath));
-
-            // Check file exists
-            var iso = new FileInfo(isoPath);
-            if (!iso.Exists)
-                throw new FileNotFoundException(nameof(isoPath));
-
-            // Calculate size of ISO
-            long size = iso.Length;
-
             // Generate Unique Identifier using ISO CRC32
             GenerateUID(isoPath);
 
             // Generate Data 2 using Disc ID
             byte[] d2 = Data2Key;
-            GenerateD2(GenerateID(size));
+            GenerateD2(GenerateID(Size));
             // Check that GetKey log matches expected Disc ID
             if (!((ReadOnlySpan<byte>)Data2Key).SequenceEqual(d2))
                 throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
 
             // Generate Disc PIC
             byte[] pic = PIC;
-            GeneratePIC(size);
+            GeneratePIC(Size);
             // Check that GetKey log matches expected PIC
             if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using DiscUtils.Iso9660;
+using DiscUtils;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -11,7 +13,7 @@ namespace LibIRD
     /// ISO Rebuild Data
     /// </summary>
     /// <remarks>Generates IRD fields and writes to an IRD file</remarks>
-    public class IRD : PS3ISO
+    public class IRD
     {
         #region Constants
 
@@ -20,6 +22,17 @@ namespace LibIRD
         /// </summary>
         /// <remarks>"3IRD"</remarks>
         private static readonly byte[] Magic = { 0x33, 0x49, 0x52, 0x44 };
+
+        /// <summary>
+        /// Blu-ray ISO sector size in bytes
+        /// </summary>
+        /// <remarks>2048</remarks>
+        private protected static readonly uint SectorSize = 2048;
+
+        /// <summary>
+        /// MD5 hash of null
+        /// </summary>
+        private protected static readonly byte[] NullMD5 = new byte[] { 0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e };
 
         /// <summary>
         /// AES CBC Encryption Key for Data 1 (Disc Key)
@@ -129,6 +142,113 @@ namespace LibIRD
         }
         private byte[] _pic;
 
+        /// <summary>
+        /// The same value stored in PARAM.SFO / TITLE_ID
+        /// </summary>
+        /// <remarks>9 bytes, ASCII, stored without dashes</remarks>
+        public string TitleID { get; private set; }
+
+        /// <summary>
+        /// The same value stored in PARAM.SFO / TITLE
+        /// </summary>
+        /// <remarks>ASCII</remarks>
+        public string Title { get; private set; }
+
+        /// <summary>
+        /// The same value stored in PARAM.SFO / PS3_SYSTEM_VER
+        /// </summary>
+        /// <remarks>4 bytes, ASCII, (e.g. "1.20", missing uses "0000"</remarks>
+        public string SystemVersion { get; private set; }
+
+        /// <summary>
+        /// The same value stored in PARAM.SFO / VERSION
+        /// </summary>
+        /// <remarks>5 bytes, ASCII, e.g. "01.20"</remarks>
+        public string GameVersion { get; private set; }
+
+        /// <summary>
+        /// The same value stored in PARAM.SFO / APP_VER
+        /// </summary>
+        /// <remarks>5 bytes, ASCII, e.g. "01.00"</remarks>
+        public string AppVersion { get; private set; }
+
+        /// <summary>
+        /// Length of the gzip-compressed header data
+        /// </summary>
+        public uint HeaderLength { get; private set; }
+
+        /// <summary>
+        /// Gzip-compressed header data
+        /// </summary>
+        public byte[] Header { get; private set; }
+
+        /// <summary>
+        /// Length of the gzip-compressed footer data
+        /// </summary>
+        public uint FooterLength { get; private set; }
+
+        /// <summary>
+        /// Gzip-compressed footer data
+        /// </summary>
+        public byte[] Footer { get; private set; }
+
+        /// <summary>
+        /// Number of complete regions in the image
+        /// </summary>
+        public byte RegionCount { get; private set; }
+
+        /// <summary>
+        /// MD5 hashes for all complete regions in the image
+        /// </summary>
+        /// <remarks><see cref="RegionCount"/> regions, 16-bytes per hash</remarks>
+        public byte[][] RegionHashes { get; private set; }
+
+        /// <summary>
+        /// Number of files in the image
+        /// </summary>
+        public uint FileCount { get; private set; }
+
+        /// <summary>
+        /// Starting sector for each file
+        /// </summary>
+        /// <remarks><see cref="FileCount"/> files, alternating with each <see cref="FileHashes"/> entry</remarks>
+        public long[] FileKeys { get; private set; }
+
+        /// <summary>
+        /// MD5 hashes for all decrypted files in the image
+        /// </summary>
+        /// <remarks><see cref="FileHashes"/> files, 16-bytes per hash, alternating with each <see cref="FileHashes"/> entry</remarks>
+        public byte[][] FileHashes { get; private set; }
+
+        /// <summary>
+        /// First byte of the PS3_DISC.SFB file
+        /// </summary>
+        /// <remarks>Last byte to read when reading the header</remarks>
+        private long FirstDataSector { get; set; }
+
+        /// <summary>
+        /// First byte of the PS3UPDAT.PUP file
+        /// </summary>
+        private long UpdateOffset { get; set; }
+
+        /// <summary>
+        /// Last byte of the PS3UPDAT.PUP file
+        /// </summary>
+        /// <remarks>Offset to use when reading the footer</remarks>
+        private long UpdateEnd { get; set; }
+
+        /// <summary>
+        /// First sector of each region
+        /// </summary>
+        private long[] RegionStart { get; set; }
+
+        /// <summary>
+        /// Last sector of each region
+        /// </summary>
+        private long[] RegionEnd { get; set; }
+
+        private protected long Size { get; private set; }
+
         #endregion
 
         #region Constructors
@@ -136,7 +256,7 @@ namespace LibIRD
         /// <summary>
         /// Manual constructor
         /// </summary>
-        private protected IRD(
+        private IRD(
             byte version,
             string titleID,
             string title,
@@ -154,18 +274,21 @@ namespace LibIRD
             byte[] d2,
             byte[] pic,
             uint uid)
-            : base(
-                titleID,
-                title,
-                sysVersion,
-                gameVersion,
-                appVersion,
-                header,
-                footer,
-                regionHashes,
-                fileKeys,
-                fileHashes)
         {
+            TitleID = titleID;
+            Title = title;
+            SystemVersion = sysVersion;
+            GameVersion = gameVersion;
+            AppVersion = appVersion;
+            HeaderLength = (uint)header.Length;
+            Header = header;
+            FooterLength = (uint)footer.Length;
+            Footer = footer;
+            RegionCount = (byte)regionHashes.Length;
+            RegionHashes = regionHashes;
+            FileCount = (uint)fileKeys.Length;
+            FileKeys = fileKeys;
+            FileHashes = fileHashes;
             Version = version;
             ExtraConfig = extraConfig;
             Attachments = attachments;
@@ -178,9 +301,10 @@ namespace LibIRD
         /// <summary>
         /// Default constructor for internal derived classes only: resulting object not in usable state
         /// </summary>
-        private protected IRD(string isoPath) : base(isoPath)
+        private protected IRD(string isoPath)
         {
             // Assumes that internally derived class will set D1/D2/PIC in its own constructor
+            GenerateIRD(isoPath);
         }
 
         /// <summary>
@@ -190,12 +314,15 @@ namespace LibIRD
         /// <param name="discKey">Disc Key, byte array of length 16</param>
         /// <param name="discID">Disc ID, byte array of length 16</param>
         /// <param name="discPIC">Disc PIC, byte array of length 115</param>
-        public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC) : base(isoPath)
+        public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC)
         {
-            // Parse DiscKey, DiscID, and PIC
+            // Parse ISO, Disc Key, Disc ID, and PIC
             GenerateD1(discKey);
             GenerateD2(discID);
             PIC = discPIC;
+
+            // Generate IRD files from ISO
+            GenerateIRD(isoPath);
         }
 
         /// <summary>
@@ -205,8 +332,90 @@ namespace LibIRD
         /// <param name="getKeyLog">Path to the .getkey.log file</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public IRD(string isoPath, string getKeyLog) : base(isoPath)
+        public IRD(string isoPath, string getKeyLog)
         {
+            // Parse .getkey.log file
+            ParseGetKeyLog(getKeyLog);
+
+            // Generate IRD files from ISO
+            GenerateIRD(isoPath);
+        }
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
+        /// </summary>
+        /// <param name="key">Byte array containing AES encrypted Disc Key</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        private protected void GenerateD1(byte[] key)
+        {
+            // Validate key
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+            if (key.Length != 16)
+                throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
+
+            // Setup AES decryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D1AesKey;
+            aes.IV = D1AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES decryption
+            using MemoryStream stream = new();
+            using ICryptoTransform dec = aes.CreateDecryptor();
+            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
+            cs.Write(key, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save decrypted key to field
+            Data1Key = stream.ToArray();
+        }
+
+        /// <summary>
+        /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
+        /// </summary>
+        /// <param name="id">Byte array containing AES decrypted Disc ID</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        private protected void GenerateD2(byte[] id)
+        {
+            // Validate id
+            if (id == null)
+                throw new ArgumentNullException(nameof(id));
+            if (id.Length != 16)
+                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
+
+            // Setup AES encryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D2AesKey;
+            aes.IV = D2AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES encryption
+            using MemoryStream stream = new();
+            using ICryptoTransform enc = aes.CreateEncryptor();
+            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
+            cs.Write(id, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save encrypted key to field
+            Data2Key = stream.ToArray();
+        }
+
+        private void ParseGetKeyLog(string getKeyLog)
+        {
+
             // Validate .getkey.log file path
             if (getKeyLog == null)
                 throw new ArgumentNullException(nameof(getKeyLog));
@@ -281,76 +490,363 @@ namespace LibIRD
             PIC = discPIC;
         }
 
-        #endregion
-
-        #region Methods
-
         /// <summary>
-        /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
+        /// Constructor for generating values from an ISO file
         /// </summary>
-        /// <param name="key">Byte array containing AES encrypted Disc Key</param>
+        /// <param name="isoPath">Path to the ISO</param>
         /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD1(byte[] key)
+        /// <exception cref="FileNotFoundException"></exception>
+        /// <exception cref="InvalidFileSystemException"></exception>
+        private void GenerateIRD(string isoPath)
         {
-            // Validate key
-            if (key == null)
-                throw new ArgumentNullException(nameof(key));
-            if (key.Length != 16)
-                throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
+            // Validate ISO path
+            if (isoPath == null || isoPath.Length <= 0)
+                throw new ArgumentNullException(nameof(isoPath));
 
-            // Setup AES decryption
-            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+            // Check file exists
+            var iso = new FileInfo(isoPath);
+            if (!iso.Exists)
+                throw new FileNotFoundException(nameof(isoPath));
 
-            // Set AES settings
-            aes.Key = D1AesKey;
-            aes.IV = D1AesIV;
-            aes.Padding = PaddingMode.None;
-            aes.Mode = CipherMode.CBC;
+            // Calculate file size
+            Size = iso.Length;
 
-            // Perform AES decryption
-            using MemoryStream stream = new();
-            using ICryptoTransform dec = aes.CreateDecryptor();
-            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
-            cs.Write(key, 0, 16);
-            cs.FlushFinalBlock();
+            // Parse ISO file as a file stream
+            using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
+            // Validate ISO file stream
+            if (!CDReader.Detect(fs))
+                throw new InvalidFileSystemException("Not a valid ISO file");
 
-            // Save decrypted key to field
-            Data1Key = stream.ToArray();
+            // New ISO Reader from DiscUtils
+            CDReader reader = new(fs, true, true);
+
+            // Read PS3 Metadata from PARAM.SFO
+            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
+            {
+                // Parse PARAM.SFO file
+                ParamSFO paramSFO = new(s);
+                // Store required values for IRD
+                TitleID = paramSFO["TITLE_ID"];
+                Title = paramSFO["TITLE"];
+                GameVersion = paramSFO["VERSION"];
+                AppVersion = paramSFO["APP_VER"];
+            }
+
+            // Determine system update version
+            GetSystemVersion(fs, reader);
+
+            // Read and compress the ISO header
+            GetHeader(fs, reader);
+
+            // Read and compress the ISO footer
+            GetFooter(fs);
+
+            // Process all regions on ISO
+            HashRegions(fs);
+
+            // TODO: Speed up program by hashing regions and files at the same time (read from filesystem only once)
+
+            // Recursively count all files in ISO to allocate file arrays
+            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
+            FileCount = 0;
+            CountFiles(rootDir);
+            FileKeys = new long[FileCount];
+            FileHashes = new byte[FileCount][];
+
+            // Determine file offsets and hashes
+            uint fileCount = FileCount;
+            FileCount = 0;
+            ProcessFiles(fs, reader, rootDir);
+            if (FileCount != fileCount)
+                throw new InvalidFileSystemException("Unexpected ISO filesystem error: ");
+            Array.Sort(FileKeys, FileHashes);
         }
 
         /// <summary>
-        /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
+        /// Retreives and stores the system version
         /// </summary>
-        /// <param name="id">Byte array containing AES decrypted Disc ID</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD2(byte[] id)
+        /// <remarks>PS3UPDAT.PUP update file version number</remarks>
+        /// <param name="fs">ISO filestream</param>
+        /// <param name="reader"></param>
+        /// <exception cref="InvalidFileSystemException"></exception>
+        private void GetSystemVersion(FileStream fs, CDReader reader)
         {
-            // Validate id
-            if (id == null)
-                throw new ArgumentNullException(nameof(id));
-            if (id.Length != 16)
-                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
+            // Determine PUP file offset via cluster
+            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
+            if (updateClusters == null || updateClusters.Length <= 0)
+            {
+                // File too small for dedicated cluster, try get the offset from the file extents instead
+                DiscUtils.Streams.StreamExtent[] updateExtents = reader.PathToExtents("\\PS3_UPDATE\\PS3UPDAT.PUP");
+                if (updateExtents == null || updateExtents.Length <= 0)
+                    throw new InvalidFileSystemException("Unexpected PS3UPDAT.PUP file extent in ISO filestream");
+                // PS3UPDAT.PUP file begins at start of first extent
+                UpdateOffset = updateExtents[0].Start;
+                // Update file ends at the last extent plus its length
+                UpdateEnd = updateExtents[^1].Start + updateExtents[^1].Length;
+            }
+            else
+            {
+                // PS3UPDAT.PUP file begins at first byte of dedicated cluster
+                UpdateOffset = updateClusters[0] != null ? SectorSize * updateClusters[0].Offset : 0;
+                // Update file ends at the last byte of the last cluster
+                UpdateEnd = SectorSize * (updateClusters[^1].Offset + updateClusters[^1].Count);
+            }
 
-            // Setup AES encryption
-            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+            // Check PUP file Magic
+            fs.Seek(UpdateOffset, SeekOrigin.Begin);
+            byte[] pupMagic = new byte[5];
+            fs.Read(pupMagic, 0, pupMagic.Length);
+            // If magic is incorrect, set version to "0000" (unknown)
+            if (Encoding.ASCII.GetString(pupMagic) != "SCEUF")
+                SystemVersion = "0000";
+            else
+            {
+                // Determine location of version string
+                fs.Seek(UpdateOffset + 0x3E, SeekOrigin.Begin);
+                byte[] offset = new byte[2];
+                fs.Read(offset, 0, 2);
+                // Move stream to PUP version string
+                Array.Reverse(offset);
+                ushort versionOffset = BitConverter.ToUInt16(offset, 0);
+                fs.Seek(UpdateOffset + versionOffset, SeekOrigin.Begin);
+                // Read version string
+                byte[] version = new byte[4];
+                fs.Read(version, 0, version.Length);
+                // Set version string
+                SystemVersion = Encoding.ASCII.GetString(version);
+            }
+        }
 
-            // Set AES settings
-            aes.Key = D2AesKey;
-            aes.IV = D2AesIV;
-            aes.Padding = PaddingMode.None;
-            aes.Mode = CipherMode.CBC;
+        /// <summary>
+        /// Retreives and stores the header
+        /// </summary>
+        /// <param name="fs">ISO filestream</param>
+        /// <param name="reader"></param>
+        /// <exception cref="InvalidFileSystemException"></exception>
+        private void GetHeader(FileStream fs, CDReader reader)
+        {
+            // Determine the extent of the header via cluster (Sector 0 to first data sector)
+            DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
+            if (sfbClusters == null || sfbClusters.Length <= 0)
+            {
+                // File too small for dedicated cluster, try get the first sector from the file extents instead
+                DiscUtils.Streams.StreamExtent[] sfbExtents = reader.PathToExtents("\\PS3_DISC.SFB");
+                if (sfbExtents == null || sfbExtents.Length <= 0)
+                    throw new InvalidFileSystemException("Unexpected PS3UPDAT.PUP file extent in ISO filestream");
+                FirstDataSector = sfbExtents[0].Start;
+            }
+            else
+            {
+                // End of header is at beginning of first byte of dedicated cluster
+                FirstDataSector = sfbClusters[0] != null ? sfbClusters[0].Offset : 0;
+            }
 
-            // Perform AES encryption
-            using MemoryStream stream = new();
-            using ICryptoTransform enc = aes.CreateEncryptor();
-            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
-            cs.Write(id, 0, 16);
-            cs.FlushFinalBlock();
+            // Begin a GZip stream to write header to
+            using MemoryStream headerStream = new();
+            using (GZipStream gzs = new(headerStream, CompressionLevel.SmallestSize))
+            {
+                // Start reading data from the beginning of the ISO file
+                fs.Seek(0, SeekOrigin.Begin);
+                byte[] buf = new byte[SectorSize];
+                int numBytes;
 
-            // Save encrypted key to field
-            Data2Key = stream.ToArray();
+                // Read all data before the first data sector
+                for (int i = 0; i < FirstDataSector; i++)
+                {
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    gzs.Write(buf, 0, numBytes);
+                }
+            }
+
+            // Save stream to field
+            Header = headerStream.ToArray();
+            HeaderLength = (uint)Header.Length;
+        }
+
+        /// <summary>
+        /// Retreives and stores the footer
+        /// </summary>
+        /// <param name="fs">ISO filestream</param>
+        private void GetFooter(FileStream fs)
+        {
+            // Begin a GZip stream to write footer to
+            using MemoryStream footerStream = new();
+            using (GZipStream gzs = new(footerStream, CompressionLevel.SmallestSize))
+            {
+                // Start reading data from after last file
+                fs.Seek(UpdateEnd, SeekOrigin.Begin);
+                byte[] buf = new byte[SectorSize];
+                int numBytes = (int)SectorSize;
+
+                // Keep reading data until there is none left to read
+                while (numBytes != 0)
+                {
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    gzs.Write(buf, 0, numBytes);
+                }
+            }
+
+            // Save stream to field
+            Footer = footerStream.ToArray();
+            FooterLength = (uint)Footer.Length;
+        }
+
+        /// <summary>
+        /// Determines and stores the hashes for each disc region
+        /// </summary>
+        /// <param name="fs"></param>
+        /// <exception cref="InvalidFileSystemException"></exception>
+        private void HashRegions(FileStream fs)
+        {
+            // Determine the number of unencryted regions
+            fs.Seek(0, SeekOrigin.Begin);
+            byte[] decRegionCount = new byte[4];
+            fs.Read(decRegionCount, 0, 4);
+
+            // Total number of regions is 2x number of unencrypted regions, minus 1
+            RegionCount = (byte)(2 * ((uint)decRegionCount[3]) - 1);
+            if (RegionCount <= 0)
+                throw new InvalidFileSystemException("No regions detected in ISO");
+            RegionHashes = new byte[RegionCount][];
+            RegionStart = new long[RegionCount];
+            RegionEnd = new long[RegionCount];
+
+            // Determine the extent for each region
+            byte[] regionSector = new byte[4];
+            fs.Seek(8, SeekOrigin.Begin);
+            fs.Read(regionSector, 0, 4);
+            Array.Reverse(regionSector, 0, 4);
+            for (int i = 0; i < RegionCount; i++)
+            {
+                // End sector of previous region is start of this region
+                if (i % 2 == 1)
+                    RegionStart[i] = BitConverter.ToInt32(regionSector) + 1;
+                else
+                    RegionStart[i] = BitConverter.ToInt32(regionSector);
+                // Determine end sector offset of this region
+                fs.Read(regionSector, 0, 4);
+                Array.Reverse(regionSector, 0, 4);
+                if (i % 2 == 1)
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector) - 1;
+                else
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector);
+            }
+
+            // Remove header from first region
+            RegionStart[0] = FirstDataSector;
+            // Remove footer from last region
+            RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
+
+            // Determine MD5 hashes for each region
+            using MD5 md5 = MD5.Create();
+            byte[] buf = new byte[SectorSize];
+            for (int i = 0; i < RegionCount; i++)
+            {
+                // Start reading data from first sector of region
+                fs.Seek(SectorSize * RegionStart[i], SeekOrigin.Begin);
+
+                // Compute MD5 hash for just the region portion of the ISO file
+                int numBytes;
+                for (long j = RegionStart[i]; j <= RegionEnd[i]; j++)
+                {
+                    // Read one sector at a time
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    // Check that an entire sector was read
+                    if (numBytes < buf.Length)
+                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                    // Process MD5 sum one sector at a time
+                    md5.TransformBlock(buf, 0, buf.Length, null, 0);
+                }
+
+                // Compute and store MD5 hash of region
+                md5.TransformFinalBlock(buf, 0, 0);
+                RegionHashes[i] = md5.Hash;
+            }
+        }
+
+        /// <summary>
+        /// Determine and store hashes for all files and files within subdirectories recursively
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <param name="path"></param>
+        private void ProcessFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
+        {
+            // Process all files in current directory
+            foreach (DiscFileInfo fileInfo in dir.GetFiles())
+            {
+                string filePath = fileInfo.FullName;
+                // Try get the first sector from the file extents instead
+                DiscUtils.Streams.StreamExtent[] fileExtents = reader.PathToExtents(filePath);
+                if (fileExtents == null || fileExtents.Length <= 0)
+                    throw new InvalidFileSystemException("Unexpected file extent in ISO filestream for " + filePath);
+                if (fileExtents.Length > 1)
+                    throw new InvalidFileSystemException("Non-contiguous file detected");
+                long firstByte = fileExtents[0].Start;
+                long fileLength = fileExtents[0].Length;
+                FileKeys[FileCount] = firstByte / 2048;
+
+                // Determine whether file is in encrypted or decrypted region
+                bool encrypted = false;
+                for (int i = RegionCount - 1; i > 0; i--)
+                {
+                    if (RegionStart[i] <= firstByte / 2048)
+                    {
+                        encrypted = i % 2 == 1;
+                        break;
+                    }
+                }
+
+                // Decrypt file if encrypted
+                if (encrypted)
+                {
+                    FileHashes[FileCount] = NullMD5;
+                    FileCount++;
+                    continue;
+                }
+
+                // Start reading data from the beginning of the ISO file
+                fs.Seek(firstByte, SeekOrigin.Begin);
+                byte[] buf = new byte[SectorSize];
+                int numBytes;
+                // Read all data before the first data sector
+                MD5 md5 = MD5.Create();
+                for (long i = 0; i < (fileLength / SectorSize); i++)
+                {
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    // Check that an entire sector was read
+                    if (numBytes < buf.Length)
+                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                    md5.TransformBlock(buf, 0, numBytes, null, 0);
+                }
+                // Read remaining partial sector
+                if (fileLength % SectorSize != 0)
+                {
+                    numBytes = fs.Read(buf, 0, (int)(fileLength % SectorSize));
+                    md5.TransformBlock(buf, 0, numBytes, null, 0);
+                }
+
+                // Finalise and store MD5 hash
+                md5.TransformFinalBlock(buf, 0, 0);
+                FileHashes[FileCount] = md5.Hash;
+                FileCount++;
+            }
+
+            // Recursively process all subfolders of current directory
+            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
+            {
+                ProcessFiles(fs, reader, dirInfo);
+            }
+        }
+
+        /// <summary>
+        /// Recursively determines file count
+        /// </summary>
+        /// <param name="dir"></param>
+        private void CountFiles(DiscDirectoryInfo dir)
+        {
+            FileCount += (uint)dir.GetFiles().Length;
+            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
+                CountFiles(dirInfo);
         }
 
         /// <summary>
