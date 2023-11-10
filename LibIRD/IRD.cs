@@ -1242,6 +1242,43 @@ namespace LibIRD
                            uid);
         }
 
+        /// <summary>
+        /// Prints IRD fields to console
+        /// </summary>
+        public void Print()
+        {
+            // Build string from parameters
+            StringBuilder print = new();
+            print.AppendLine("IRD Contents:");
+            print.AppendLine("=============");
+
+            // Append IRD fields to string builder
+            print.AppendLine($"Magic:        3IRD");
+            print.AppendLine($"IRD Version:  {Version}");
+            print.AppendLine($"Title ID:     {TitleID}");
+            print.AppendLine($"Title:        {Title}");
+            print.AppendLine($"PUP Version:  {SystemVersion}");
+            print.AppendLine($"Game Version: {GameVersion}");
+            print.AppendLine($"App Version:  {AppVersion}");
+            print.AppendLine($"Regions:      {RegionCount}");
+            print.AppendLine($"Files:        {FileCount}");
+            if (ExtraConfig != 0x0000)
+                print.AppendLine($"Extra Config: {ExtraConfig:X4}");
+            if (Attachments != 0x0000)
+                print.AppendLine($"Attachments:  {Attachments:X4}");
+            print.AppendLine($"Unique ID:    {UID:X8}");
+            print.AppendLine($"Data 1 Key:   {Convert.ToHexString(Data1Key)}");
+            print.AppendLine($"Data 2 Key:   {Convert.ToHexString(Data2Key)}");
+            print.AppendLine($"PIC:          {Convert.ToHexString(PIC)}");
+            print.AppendLine();
+
+            // Ensure UTF-8 will display properly
+            Console.OutputEncoding = Encoding.UTF8;
+
+            // Print formatted string
+            Console.Write(print);
+        }
+
         #endregion
     }
 }

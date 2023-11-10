@@ -208,7 +208,9 @@ namespace LibIRD
         public void Print()
         {
             // Build string from parameters
-            StringBuilder print = new("PARAM.SFO Contents:\n====================\n");
+            StringBuilder print = new();
+            print.AppendLine("PARAM.SFO Contents:");
+            print.AppendLine("====================");
 
             // Loop through all parameters in PARAM.SFO
             for (int i = 0; i < ParamCount; i++)
@@ -221,9 +223,10 @@ namespace LibIRD
                 {
                     case 0x0404:
                         print.Append(Params[i].IntValue);
+                        print.AppendLine();
                         break;
                     default:
-                        print.Append(Params[i].StringValue);
+                        print.AppendLine(Params[i].StringValue);
                         break;
                 }
                 print.Append('\n');

@@ -19,41 +19,23 @@ namespace BuildIRD
 
                 IRD ird1 = new ReIRD("./game.iso", discKey);
                 ird1.Write("./test1.ird");
-                Console.WriteLine("IRD created using .key:");
-
-                // Read IRD and print details to console
-                IRD ird = IRD.Read("./test1.ird");
-                Console.WriteLine("IRD Version: " + ird.Version);
-                Console.WriteLine("Title ID: " + ird.TitleID);
-                Console.WriteLine("Title: " + ird.Title);
-                Console.WriteLine("System Version: " + ird.SystemVersion);
-                Console.WriteLine("Game Version: " + ird.GameVersion);
-                Console.WriteLine("App Version: " + ird.AppVersion);
+                ird1.Print();
             }
             catch (FileNotFoundException e)
             {
-                Console.WriteLine("File not found: " + e.FileName);
+                Console.WriteLine("ERROR: File not found");
             }
 
-            // Create new reproducible redump-style IRD with a GetKey log
+            // Create new reproducible redump-style IRD with a ManaGunZ log
             try
             {
                 IRD ird2 = new ReIRD("./game.iso", "./log.getkey.log");
                 ird2.Write("./test2.ird");
-                Console.WriteLine("IRD created using .getkey.log:");
-
-                // Read IRD and print details to console
-                IRD ird = IRD.Read("./test2.ird");
-                Console.WriteLine("IRD Version: " + ird.Version);
-                Console.WriteLine("Title ID: " + ird.TitleID);
-                Console.WriteLine("Title: " + ird.Title);
-                Console.WriteLine("System Version: " + ird.SystemVersion);
-                Console.WriteLine("Game Version: " + ird.GameVersion);
-                Console.WriteLine("App Version: " + ird.AppVersion);
+                ird2.Print();
             }
             catch (FileNotFoundException e)
             {
-                Console.WriteLine("File not found: " + e.FileName);
+                Console.WriteLine("ERROR: File not found");
             }
         }
     }

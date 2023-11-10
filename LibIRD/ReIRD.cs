@@ -56,7 +56,7 @@ namespace LibIRD
         /// <summary>
         /// ISO file size
         /// </summary>
-        public long Size { get; private set; }
+        private long Size { get; set; }
 
         #endregion
 

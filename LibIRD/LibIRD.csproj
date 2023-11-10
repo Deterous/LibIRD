@@ -9,7 +9,8 @@
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
-    <Copyright>Copyright (c)2023 Deterous</Copyright>
+    <Copyright>Copyright (c) Deterous 2023</Copyright>
+    <PackageReadmeFile>README.MD</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Deterous/LibIRD</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>ps3 iso ird</PackageTags>
