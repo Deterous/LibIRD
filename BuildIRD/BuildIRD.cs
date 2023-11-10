@@ -21,7 +21,7 @@ namespace BuildIRD
                 ird1.Write("./test1.ird");
                 ird1.Print();
             }
-            catch (FileNotFoundException e)
+            catch (FileNotFoundException)
             {
                 Console.WriteLine("ERROR: File not found");
             }
@@ -33,7 +33,7 @@ namespace BuildIRD
                 ird2.Write("./test2.ird");
                 ird2.Print();
             }
-            catch (FileNotFoundException e)
+            catch (FileNotFoundException)
             {
                 Console.WriteLine("ERROR: File not found");
             }
