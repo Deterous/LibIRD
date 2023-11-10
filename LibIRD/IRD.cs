@@ -1,5 +1,5 @@
-﻿using DiscUtils.Iso9660;
-using DiscUtils;
+﻿using DiscUtils;
+using DiscUtils.Iso9660;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -12,10 +12,22 @@ namespace LibIRD
     /// <summary>
     /// ISO Rebuild Data
     /// </summary>
-    /// <remarks>Generates IRD fields and writes to an IRD file</remarks>
+    /// <remarks>Generates IRD fields and reads/writes IRD files</remarks>
     public class IRD
     {
         #region Constants
+
+        /// <summary>
+        /// Blu-ray ISO sector size in bytes
+        /// </summary>
+        /// <remarks>2048</remarks>
+        private protected const uint SectorSize = 2048;
+
+        /// <summary>
+        /// Size of a blu-ray layer in bytes (BD-25 max size)
+        /// </summary>
+        /// <remarks>12219392 sectors, default PS3 layerbreak value</remarks>
+        private protected const long BDLayerSize = 25025314816;
 
         /// <summary>
         /// IRD file signature
@@ -24,15 +36,9 @@ namespace LibIRD
         private static readonly byte[] Magic = { 0x33, 0x49, 0x52, 0x44 };
 
         /// <summary>
-        /// Blu-ray ISO sector size in bytes
-        /// </summary>
-        /// <remarks>2048</remarks>
-        private protected static readonly uint SectorSize = 2048;
-
-        /// <summary>
         /// MD5 hash of null
         /// </summary>
-        private protected static readonly byte[] NullMD5 = new byte[] { 0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e };
+        private static readonly byte[] NullMD5 = new byte[] { 0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e };
 
         /// <summary>
         /// AES CBC Encryption Key for Data 1 (Disc Key)
@@ -92,6 +98,27 @@ namespace LibIRD
         public ushort Attachments { get; set; } = 0x0000; // Default to zero
 
         /// <summary>
+        /// Disc Key
+        /// </summary>
+        /// <remarks>16 bytes</remarks>
+        public byte[] DiscKey
+        {
+            get { return _discKey; }
+            set
+            {
+                if (value != null && value.Length == 16)
+                {
+                    _discKey = value;
+                    _data1Key = GenerateD1(value);
+                }
+                else
+                    throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(value));
+            }
+        }
+        private byte[] _discKey;
+        // TODO: Link Data1Key and Disc Key
+
+        /// <summary>
         /// D1 key
         /// </summary>
         /// <remarks>16 bytes</remarks>
@@ -101,12 +128,35 @@ namespace LibIRD
             set
             {
                 if (value != null && value.Length == 16)
+                {
                     _data1Key = value;
+                    _discKey = GenerateDiscKey(value);
+                }
                 else
                     throw new ArgumentException("Data 1 Key must be a byte array of length 16", nameof(value));
             }
         }
         private byte[] _data1Key;
+
+        /// <summary>
+        /// D2 key
+        /// </summary>
+        /// <remarks>16 bytes</remarks>
+        public byte[] DiscID
+        {
+            get { return _discID; }
+            set
+            {
+                if (value != null && value.Length == 16)
+                {
+                    _discID = value;
+                    _data2Key = GenerateD2(value);
+                }
+                else
+                    throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(value));
+            }
+        }
+        private byte[] _discID;
 
         /// <summary>
         /// D2 key
@@ -118,7 +168,10 @@ namespace LibIRD
             set
             {
                 if (value != null && value.Length == 16)
+                {
                     _data2Key = value;
+                    _discID = GenerateDiscID(value);
+                }
                 else
                     throw new ArgumentException("Data 2 Key must be a byte array of length 16", nameof(value));
             }
@@ -247,8 +300,6 @@ namespace LibIRD
         /// </summary>
         private long[] RegionEnd { get; set; }
 
-        private protected long Size { get; private set; }
-
         #endregion
 
         #region Constructors
@@ -301,10 +352,9 @@ namespace LibIRD
         /// <summary>
         /// Default constructor for internal derived classes only: resulting object not in usable state
         /// </summary>
-        private protected IRD(string isoPath)
+        private protected IRD()
         {
-            // Assumes that internally derived class will set D1/D2/PIC in its own constructor
-            GenerateIRD(isoPath);
+            // Assumes that internally derived class will set fields in its own constructor
         }
 
         /// <summary>
@@ -317,6 +367,7 @@ namespace LibIRD
         public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC)
         {
             // Parse ISO, Disc Key, Disc ID, and PIC
+            DiscKey = discKey;
             GenerateD1(discKey);
             GenerateD2(discID);
             PIC = discPIC;
@@ -343,7 +394,7 @@ namespace LibIRD
 
         #endregion
 
-        #region Methods
+        #region Property Generation
 
         /// <summary>
         /// Generates Data 1, via AES-128 CBC decryption of a Disc Key
@@ -351,7 +402,8 @@ namespace LibIRD
         /// <param name="key">Byte array containing AES encrypted Disc Key</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD1(byte[] key)
+        /// <exception cref="InvalidOperationException"></exception>
+        private protected static byte[] GenerateD1(byte[] key)
         {
             // Validate key
             if (key == null)
@@ -376,22 +428,58 @@ namespace LibIRD
             cs.FlushFinalBlock();
 
             // Save decrypted key to field
-            Data1Key = stream.ToArray();
+            return stream.ToArray();
+        }
+
+        /// <summary>
+        /// Generates the Disc key, via AES-128 CBC encryption of a Data 1 Key
+        /// </summary>
+        /// <param name="d1">Byte array containing AES decrypted Data 1 Key</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="InvalidOperationException"></exception>
+        private protected static byte[] GenerateDiscKey(byte[] d1)
+        {
+            // Validate key
+            if (d1 == null)
+                throw new ArgumentNullException(nameof(d1));
+            if (d1.Length != 16)
+                throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(d1));
+
+            // Setup AES decryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D1AesKey;
+            aes.IV = D1AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES decryption
+            using MemoryStream stream = new();
+            using ICryptoTransform enc = aes.CreateEncryptor();
+            using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
+            cs.Write(d1, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save decrypted key to field
+            return stream.ToArray();
         }
 
         /// <summary>
         /// Generates Data 2, via AES-128 CBC encryption of a Disc ID
         /// </summary>
-        /// <param name="id">Byte array containing AES decrypted Disc ID</param>
+        /// <param name="d2">Byte array containing AES decrypted Disc ID</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        private protected void GenerateD2(byte[] id)
+        /// <exception cref="InvalidOperationException"></exception>
+        private protected static byte[] GenerateD2(byte[] d2)
         {
             // Validate id
-            if (id == null)
-                throw new ArgumentNullException(nameof(id));
-            if (id.Length != 16)
-                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(id));
+            if (d2 == null)
+                throw new ArgumentNullException(nameof(d2));
+            if (d2.Length != 16)
+                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
@@ -406,14 +494,56 @@ namespace LibIRD
             using MemoryStream stream = new();
             using ICryptoTransform enc = aes.CreateEncryptor();
             using CryptoStream cs = new(stream, enc, CryptoStreamMode.Write);
-            cs.Write(id, 0, 16);
+            cs.Write(d2, 0, 16);
             cs.FlushFinalBlock();
 
             // Save encrypted key to field
-            Data2Key = stream.ToArray();
+            return stream.ToArray();
         }
 
-        private void ParseGetKeyLog(string getKeyLog)
+        /// <summary>
+        /// Generates Disc ID, via AES-128 CBC decryption of a Data 2 Key
+        /// </summary>
+        /// <param name="d2">Byte array containing AES encrypted Data 2 Key</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="InvalidOperationException"></exception>
+        private protected static byte[] GenerateDiscID(byte[] d2)
+        {
+            // Validate id
+            if (d2 == null)
+                throw new ArgumentNullException(nameof(d2));
+            if (d2.Length != 16)
+                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
+
+            // Setup AES encryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = D2AesKey;
+            aes.IV = D2AesIV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Perform AES encryption
+            using MemoryStream stream = new();
+            using ICryptoTransform dec = aes.CreateDecryptor();
+            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
+            cs.Write(d2, 0, 16);
+            cs.FlushFinalBlock();
+
+            // Save encrypted key to field
+            return stream.ToArray();
+        }
+
+        /// <summary>
+        /// Generates Data1Key, Data2Key, and PIC from the .getkey.log file
+        /// </summary>
+        /// <param name="getKeyLog">Path to the .getkey.log file</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        /// <exception cref="InvalidDataException"></exception>
+        private protected void ParseGetKeyLog(string getKeyLog)
         {
 
             // Validate .getkey.log file path
@@ -485,8 +615,8 @@ namespace LibIRD
             }
 
             // Parse DiscKey, DiscID, and PIC
-            GenerateD1(discKey);
-            GenerateD2(discID);
+            DiscKey = discKey;
+            DiscID = discID;
             PIC = discPIC;
         }
 
@@ -497,20 +627,8 @@ namespace LibIRD
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidFileSystemException"></exception>
-        private void GenerateIRD(string isoPath)
+        private protected void GenerateIRD(string isoPath)
         {
-            // Validate ISO path
-            if (isoPath == null || isoPath.Length <= 0)
-                throw new ArgumentNullException(nameof(isoPath));
-
-            // Check file exists
-            var iso = new FileInfo(isoPath);
-            if (!iso.Exists)
-                throw new FileNotFoundException(nameof(isoPath));
-
-            // Calculate file size
-            Size = iso.Length;
-
             // Parse ISO file as a file stream
             using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
             // Validate ISO file stream
@@ -561,6 +679,10 @@ namespace LibIRD
                 throw new InvalidFileSystemException("Unexpected ISO filesystem error: ");
             Array.Sort(FileKeys, FileHashes);
         }
+
+        #endregion
+
+        #region Reading ISO
 
         /// <summary>
         /// Retreives and stores the system version
@@ -782,26 +904,19 @@ namespace LibIRD
                 if (fileExtents.Length > 1)
                     throw new InvalidFileSystemException("Non-contiguous file detected");
                 long firstByte = fileExtents[0].Start;
+                int firstSector = (int)(firstByte / 2048);
                 long fileLength = fileExtents[0].Length;
-                FileKeys[FileCount] = firstByte / 2048;
+                FileKeys[FileCount] = firstSector;
 
                 // Determine whether file is in encrypted or decrypted region
                 bool encrypted = false;
                 for (int i = RegionCount - 1; i > 0; i--)
                 {
-                    if (RegionStart[i] <= firstByte / 2048)
+                    if (RegionStart[i] <= firstSector)
                     {
                         encrypted = i % 2 == 1;
                         break;
                     }
-                }
-
-                // Decrypt file if encrypted
-                if (encrypted)
-                {
-                    FileHashes[FileCount] = NullMD5;
-                    FileCount++;
-                    continue;
                 }
 
                 // Start reading data from the beginning of the ISO file
@@ -810,19 +925,30 @@ namespace LibIRD
                 int numBytes;
                 // Read all data before the first data sector
                 MD5 md5 = MD5.Create();
-                for (long i = 0; i < (fileLength / SectorSize); i++)
+                for (int i = 0; i < (fileLength / SectorSize); i++)
                 {
                     numBytes = fs.Read(buf, 0, buf.Length);
                     // Check that an entire sector was read
                     if (numBytes < buf.Length)
                         throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                    // Decrypt sector if necessary
+                    if (encrypted)
+                        buf = DecryptSector(buf, firstSector + i);
+                    // Hash sector
                     md5.TransformBlock(buf, 0, numBytes, null, 0);
                 }
                 // Read remaining partial sector
                 if (fileLength % SectorSize != 0)
                 {
-                    numBytes = fs.Read(buf, 0, (int)(fileLength % SectorSize));
-                    md5.TransformBlock(buf, 0, numBytes, null, 0);
+                    numBytes = fs.Read(buf, 0, buf.Length);
+                    // Check that an entire sector was read
+                    if (numBytes < buf.Length)
+                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                    // Decrypt partial sector if necessary
+                    if (encrypted)
+                        buf = DecryptSector(buf, firstSector + (int)(fileLength / SectorSize));
+                    // Hash partial sector
+                    md5.TransformBlock(buf, 0, (int)(fileLength % SectorSize), null, 0);
                 }
 
                 // Finalise and store MD5 hash
@@ -839,6 +965,41 @@ namespace LibIRD
         }
 
         /// <summary>
+        /// Decrypts a given sector byte array
+        /// </summary>
+        /// <param name="sector">Byte array to be decrypted</param>
+        /// <exception cref="InvalidOperationException"></exception>
+        private protected byte[] DecryptSector(byte[] sector, int sectorNumber)
+        {
+            // Setup AES decryption
+            using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+
+            // Set AES settings
+            aes.Key = DiscKey;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.CBC;
+
+            // Determine Initial Value based on sector number
+            byte[] iv = new byte[16];
+            for (int i = 0; i < 16; i++)
+            {
+                byte a = (byte)(sectorNumber & 0xFF);
+                iv[16 - i - 1] = (byte)(sectorNumber & 0xFF);
+                sectorNumber >>= 8;
+            }
+            aes.IV = iv;
+
+            // Perform AES decryption
+            using MemoryStream stream = new();
+            using ICryptoTransform dec = aes.CreateDecryptor();
+            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
+            cs.Write(sector, 0, sector.Length);
+            cs.FlushFinalBlock();
+
+            return stream.ToArray();
+        }
+
+        /// <summary>
         /// Recursively determines file count
         /// </summary>
         /// <param name="dir"></param>
@@ -848,6 +1009,10 @@ namespace LibIRD
             foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
                 CountFiles(dirInfo);
         }
+
+        #endregion
+
+        #region IRD File
 
         /// <summary>
         /// Write IRD data to file
@@ -1011,13 +1176,11 @@ namespace LibIRD
 
             // Read Header
             uint headerLength = br.ReadUInt32();
-            byte[] header = new byte[headerLength];
-            br.Read(header, 0, header.Length);
+            byte[] header = br.ReadBytes((int)headerLength);
 
             // Read Footer
             uint footerLength = br.ReadUInt32();
-            byte[] footer = new byte[footerLength];
-            br.Read(footer, 0, footer.Length);
+            byte[] footer = br.ReadBytes((int)footerLength);
 
             // Read region hashes
             byte regionCount = br.ReadByte();

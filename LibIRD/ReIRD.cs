@@ -51,18 +51,78 @@ namespace LibIRD
     /// </summary>
     public class ReIRD : IRD
     {
-
-        #region Constants
+        #region Properties
 
         /// <summary>
-        /// Size of a blu-ray layer in bytes (BD-25 max size)
+        /// ISO file size
         /// </summary>
-        /// <remarks>Can be used as the default PS3 layerbreak value</remarks>
-        private const long BDLayerSize = 25025314816; // 12219392 sectors
+        public long Size { get; private set; }
 
         #endregion
 
-        #region Property Generation
+        #region Constructors
+
+        /// <summary>
+        /// Constructor using .getkey.log for Disc Key
+        /// </summary>
+        /// <param name="isoPath">Path to the ISO</param>
+        /// <param name="getKeyLog">Path to the GetKey log file</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        /// <exception cref="InvalidDataException"></exception>
+        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog)
+        {
+            // Generate Unique Identifier using ISO CRC32
+            UID = GenerateUID(isoPath);
+
+            // Determine ISO file size
+            Size = CalculateSize(isoPath);
+
+            // Generate Data 2 using Disc ID
+            DiscID = GenerateID(Size);
+            // Check that GetKey log matches expected Disc ID
+            //if (!((ReadOnlySpan<byte>)Data2Key).SequenceEqual(d2))
+            //    throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
+
+            // Generate Disc PIC
+            byte[] pic = GeneratePIC(Size);
+            // Check that GetKey log matches expected PIC
+            if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
+                throw new InvalidDataException("Unexpected PIC in .getkey.log");
+        }
+
+        /// <summary>
+        /// Constructor with optional additional region to generate a specific Disc ID
+        /// </summary>
+        /// <param name="isoPath">Path to the ISO</param>
+        /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
+        /// <param name="region">Disc Region</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        public ReIRD(string isoPath, byte[] key, Region region = Region.NONE)
+        {
+            // Generate Unique Identifier using ISO CRC32
+            UID = GenerateUID(isoPath);
+
+            // Determine ISO file size
+            Size = CalculateSize(isoPath);
+
+            // Set Disc Key
+            DiscKey = key;
+
+            // Generate Data 2 using Disc ID
+            DiscID = GenerateID(Size, region);
+
+            // Generate Disc PIC
+            PIC = GeneratePIC(Size);
+
+            // Generate IRD fields
+            GenerateIRD(isoPath);
+        }
+
+        #endregion
+
+        #region Methods
 
         /// <summary>
         /// Generates a Disc ID given a size and region, where region is a single byte
@@ -87,7 +147,7 @@ namespace LibIRD
         /// <param name="layerbreak">Layer break value, byte at which disc layers are split across</param>
         /// <param name="exactIRD">True to generate a PIC in 3k3y style (0x03 at 115th byte for BD-50 discs)</param>
         /// <exception cref="ArgumentException"></exception>
-        private void GeneratePIC(long size, long layerbreak = BDLayerSize, bool exactIRD = false)
+        private static byte[] GeneratePIC(long size, long layerbreak = BDLayerSize, bool exactIRD = false)
         {
             // Validate size
             if (size == 0 || (size % SectorSize) != 0)
@@ -97,13 +157,14 @@ namespace LibIRD
                 throw new ArgumentException("Layerbreak in bytes must be a positive integer less than the ISO Size", nameof(size));
 
             // TODO: Generate correct PICs for Hybrid PS3 discs (BD-50 with layerbreak value other than 12219392)
+            byte[] pic;
             if (size > BDLayerSize) // if BD-50
             {
                 // num_sectors + layer_sector_end (0x00100000) + sectors_between_layers (0x01358C00 - 0x00CA73FE) - 3
                 byte[] total_sectors = BitConverter.GetBytes((uint)(size / SectorSize + 8067071));
 
                 // Initial portion of PIC (24 bytes)
-                PIC = new byte[]{
+                pic = new byte[]{
                 // [4098 bytes] [2x 0x00] ["DI"]   [v1] [10units] [DI num]
                 0x10, 0x02, 0x00, 0x00, 0x44, 0x49, 0x01, 0x10, 0x00, 0x00, 0x20, 0x00,
                 //   ["BDR"]         [2 layers]
@@ -132,7 +193,7 @@ namespace LibIRD
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
                 // 3k3y style: 0x03 at last byte
                 if (exactIRD)
-                    PIC[114] = 0x03;
+                    pic[114] = 0x03;
 
             }
             else // if BD-25
@@ -143,7 +204,7 @@ namespace LibIRD
                 byte[] end_sector = BitConverter.GetBytes((uint)(size / SectorSize + 1048574));
 
                 // Initial portion of PIC (24 bytes)
-                PIC = new byte[]{ 0x10, 0x02, 0x00, 0x00, 0x44, 0x49, 0x01, 0x08, 0x00, 0x00, 0x20, 0x00,
+                pic = new byte[]{ 0x10, 0x02, 0x00, 0x00, 0x44, 0x49, 0x01, 0x08, 0x00, 0x00, 0x20, 0x00,
                                      0x42, 0x44, 0x4F, 0x01, 0x11, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                 // Total sectors used on disc (4 bytes)
                 total_sectors[3], total_sectors[2], total_sectors[1], total_sectors[0],
@@ -158,69 +219,17 @@ namespace LibIRD
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             }
+            
+            return pic;
         }
 
         /// <summary>
         /// Generates the UID field by computing the CRC32 hash of the ISO
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
-        private void GenerateUID(string isoPath)
-        {
-            // Compute CRC32 hash
-            byte[] crc32;
-            using (FileStream fs = File.OpenRead(isoPath))
-            {
-                Crc32 hasher = new();
-                hasher.Append(fs);
-                crc32 = hasher.GetCurrentHash();
-                Array.Reverse(crc32);
-            }
-
-            // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
-            UID = BitConverter.ToUInt32(crc32, 0);
-        }
-
-        #endregion
-
-        #region Constructors
-
-        /// <summary>
-        /// Constructor using .getkey.log for Disc Key
-        /// </summary>
-        /// <param name="isoPath">Path to the ISO</param>
-        /// <param name="getKeyLog">Path to the GetKey log file</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
-        /// <exception cref="InvalidDataException"></exception>
-        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog)
-        {
-            // Generate Unique Identifier using ISO CRC32
-            GenerateUID(isoPath);
-
-            // Generate Data 2 using Disc ID
-            byte[] d2 = Data2Key;
-            GenerateD2(GenerateID(Size));
-            // Check that GetKey log matches expected Disc ID
-            if (!((ReadOnlySpan<byte>)Data2Key).SequenceEqual(d2))
-                throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
-
-            // Generate Disc PIC
-            byte[] pic = PIC;
-            GeneratePIC(Size);
-            // Check that GetKey log matches expected PIC
-            if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
-                throw new InvalidDataException("Unexpected PIC in .getkey.log");
-        }
-
-        /// <summary>
-        /// Constructor with optional additional region to generate a specific Disc ID
-        /// </summary>
-        /// <param name="isoPath">Path to the ISO</param>
-        /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
-        /// <param name="region">Disc Region</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="FileNotFoundException"></exception>
-        public ReIRD(string isoPath, byte[] key, Region region = Region.NONE) : base(isoPath)
+        private static uint GenerateUID(string isoPath)
         {
             // Validate ISO path
             if (isoPath == null || isoPath.Length <= 0)
@@ -229,22 +238,40 @@ namespace LibIRD
             // Check file exists
             var iso = new FileInfo(isoPath);
             if (!iso.Exists)
-                throw new FileNotFoundException(isoPath);
+                throw new FileNotFoundException(nameof(isoPath));
 
-            // Calculate size of ISO
-            long size = iso.Length;
+            // Compute CRC32 hash
+            byte[] crc32;
+            using (FileStream fs = File.OpenRead(isoPath))
+            {
+                Crc32 hasher = new();
+                hasher.Append(fs);
+                crc32 = hasher.GetCurrentHash();
+            }
 
-            // Generate Unique Identifier using ISO CRC32
-            GenerateUID(isoPath);
+            // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
+            return BitConverter.ToUInt32(crc32, 0);
+        }
 
-            // Generate Data 1 using Disc Key
-            GenerateD1(key);
+        /// <summary>
+        /// Calculates ISO file size
+        /// </summary>
+        /// <param name="isoPath">Path to the ISO</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="FileNotFoundException"></exception>
+        private static long CalculateSize(string isoPath)
+        {
+            // Validate ISO path
+            if (isoPath == null || isoPath.Length <= 0)
+                throw new ArgumentNullException(nameof(isoPath));
 
-            // Generate Data 2 using Disc ID
-            GenerateD2(GenerateID(size, region));
+            // Check file exists
+            var iso = new FileInfo(isoPath);
+            if (!iso.Exists)
+                throw new FileNotFoundException(nameof(isoPath));
 
-            // Generate Disc PIC
-            GeneratePIC(size);
+            // Calculate file size
+            return iso.Length;
         }
 
         #endregion

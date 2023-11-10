@@ -11,27 +11,15 @@ namespace BuildIRD
         {
             Console.OutputEncoding = Encoding.UTF8;
 
-            // Create new reproducible redump-style IRD with a key
-            byte[] discKey = new byte[] { 0x1A, 0x2D, 0x88, 0xFC, 0x19, 0x37, 0x27, 0x44, 0x11, 0x5E, 0xE9, 0x83, 0xA0, 0x47, 0xE2, 0xD5 };
-            string fileName = "./game.iso";
+            // Create new reproducible redump-style IRD with a key file
             try
             {
-                IRD ird1 = new ReIRD(fileName, discKey);
-                ird1.Write("./test1.ird");
-                Console.WriteLine("IRD for " + fileName + " created");
+                // Read key from .key file
+                byte[] discKey = File.ReadAllBytes("./game.key");
 
-                // Create new reproducible redump-style IRD with a GetKey log
-                string logPath = "./log.getkey.log";
-                try
-                {
-                    IRD ird2 = new ReIRD(fileName, logPath);
-                    ird2.Write("./test2.ird");
-                    Console.WriteLine("IRD for " + fileName + " created");
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.WriteLine("File not found: " + logPath);
-                }
+                IRD ird1 = new ReIRD("./game.iso", discKey);
+                ird1.Write("./test1.ird");
+                Console.WriteLine("IRD created using .key:");
 
                 // Read IRD and print details to console
                 IRD ird = IRD.Read("./test1.ird");
@@ -42,9 +30,30 @@ namespace BuildIRD
                 Console.WriteLine("Game Version: " + ird.GameVersion);
                 Console.WriteLine("App Version: " + ird.AppVersion);
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException e)
             {
-                Console.WriteLine("File not found: " + fileName);
+                Console.WriteLine("File not found: " + e.FileName);
+            }
+
+            // Create new reproducible redump-style IRD with a GetKey log
+            try
+            {
+                IRD ird2 = new ReIRD("./game.iso", "./log.getkey.log");
+                ird2.Write("./test2.ird");
+                Console.WriteLine("IRD created using .getkey.log:");
+
+                // Read IRD and print details to console
+                IRD ird = IRD.Read("./test2.ird");
+                Console.WriteLine("IRD Version: " + ird.Version);
+                Console.WriteLine("Title ID: " + ird.TitleID);
+                Console.WriteLine("Title: " + ird.Title);
+                Console.WriteLine("System Version: " + ird.SystemVersion);
+                Console.WriteLine("Game Version: " + ird.GameVersion);
+                Console.WriteLine("App Version: " + ird.AppVersion);
+            }
+            catch (FileNotFoundException e)
+            {
+                Console.WriteLine("File not found: " + e.FileName);
             }
         }
     }

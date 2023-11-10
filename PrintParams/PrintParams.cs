@@ -13,7 +13,7 @@ namespace PrintParams
             if (File.Exists(filename))
             {
                 ParamSFO paramSFO = new("./PARAM.SFO");
-                Console.WriteLine(paramSFO["TITLE_ID"]);
+                Console.WriteLine("PARAM.SFO for: " + paramSFO["TITLE_ID"] + '\n');
                 paramSFO.Print();
             }
             else
