@@ -70,7 +70,7 @@ namespace LibIRD
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog)
+        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true)
         {
             // Generate Unique Identifier using ISO CRC32
             UID = GenerateUID(isoPath);
@@ -117,7 +117,7 @@ namespace LibIRD
             PIC = GeneratePIC(Size);
 
             // Generate IRD fields
-            GenerateIRD(isoPath);
+            GenerateIRD(isoPath, true);
         }
 
         #endregion

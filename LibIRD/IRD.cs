@@ -364,7 +364,8 @@ namespace LibIRD
         /// <param name="discKey">Disc Key, byte array of length 16</param>
         /// <param name="discID">Disc ID, byte array of length 16</param>
         /// <param name="discPIC">Disc PIC, byte array of length 115</param>
-        public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC)
+        /// <param name="redump">True if redump-style IRD</param>
+        public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC, bool redump = false)
         {
             // Parse ISO, Disc Key, Disc ID, and PIC
             DiscKey = discKey;
@@ -373,7 +374,7 @@ namespace LibIRD
             PIC = discPIC;
 
             // Generate IRD files from ISO
-            GenerateIRD(isoPath);
+            GenerateIRD(isoPath, redump);
         }
 
         /// <summary>
@@ -381,15 +382,14 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="getKeyLog">Path to the .getkey.log file</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="InvalidDataException"></exception>
-        public IRD(string isoPath, string getKeyLog)
+        /// <param name="redump">True if redump-style IRD</param>
+        public IRD(string isoPath, string getKeyLog, bool redump = false)
         {
             // Parse .getkey.log file
             ParseGetKeyLog(getKeyLog);
 
             // Generate IRD files from ISO
-            GenerateIRD(isoPath);
+            GenerateIRD(isoPath, redump);
         }
 
         #endregion
@@ -624,10 +624,11 @@ namespace LibIRD
         /// Constructor for generating values from an ISO file
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
+        /// <param name="redump">True if redump-style IRD</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidFileSystemException"></exception>
-        private protected void GenerateIRD(string isoPath)
+        private protected void GenerateIRD(string isoPath, bool redump = false)
         {
             // Parse ISO file as a file stream
             using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
@@ -638,15 +639,46 @@ namespace LibIRD
             // New ISO Reader from DiscUtils
             CDReader reader = new(fs, true, true);
 
+            // Redump-style IRDs set the lowest bit of ExtraConfig to 1
+            ExtraConfig |= 0x01;
+
+            // If generating redump-style IRD, read PS3 Metadata from PS3_DISC.SFB
+            if (redump)
+            {
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+
+                // Parse PS3_DISC.SFB file
+                PS3_DiscSFB ps3_DiscSFB = new(s);
+                
+                // Redump-style IRDs use the TITLE ID
+                if (ps3_DiscSFB.Field.ContainsKey("TITLE_ID") && ps3_DiscSFB.Field["TITLE_ID"].Length == 10 && ps3_DiscSFB.Field["TITLE_ID"][4] == '-')
+                {
+                    // Use the TITLE_ID from PS3_DISC.SFB
+                    TitleID = string.Concat(ps3_DiscSFB.Field["TITLE_ID"].AsSpan(0, 4), ps3_DiscSFB.Field["TITLE_ID"].AsSpan(5, 5));
+                }
+                else
+                {
+                    // Valid Title ID not found in PS3_DISC.SFB, use the one in PS3_GAME/PARAM.SFO
+                    redump = false;
+                }
+
+                // If the version field is present, this is a multi-game disc
+                // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
+                if (ps3_DiscSFB.Field.ContainsKey("VERSION"))
+                    GameVersion = ps3_DiscSFB.Field["VERSION"];
+            }
+
             // Read PS3 Metadata from PARAM.SFO
             using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
                 // Store required values for IRD
-                TitleID = paramSFO["TITLE_ID"];
+                if (!redump)
+                    TitleID = paramSFO["TITLE_ID"];
                 Title = paramSFO["TITLE"];
-                GameVersion = paramSFO["VERSION"];
+                if (GameVersion == null)
+                    GameVersion = paramSFO["VERSION"];
                 AppVersion = paramSFO["APP_VER"];
             }
 

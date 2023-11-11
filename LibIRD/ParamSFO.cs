@@ -18,7 +18,7 @@ namespace LibIRD
         /// <summary>
         /// PARAM.SFO file version
         /// </summary>
-        /// <remarks>Typically { 0x01 0x01 0x00 0x00 } (v1.1)</remarks>
+        /// <remarks>Typically { 0x01, 0x01, 0x00, 0x00 } (v1.1)</remarks>
         public uint Version { get; private set; }
 
         /// <summary>
@@ -117,7 +117,7 @@ namespace LibIRD
         /// <summary>
         /// Constructor using a PARAM.SFO file path
         /// </summary>
-        /// <param name="sfoPath">Full file path to the PARAM.SFO</param>
+        /// <param name="sfoPath">Full file path to the PARAM.SFO file</param>
         /// <exception cref="ArgumentNullException"></exception>
         public ParamSFO(string sfoPath)
         {
@@ -143,7 +143,7 @@ namespace LibIRD
             // Check file signature is correct
             string magic = Encoding.ASCII.GetString(br.ReadBytes(4));
             if (magic != ParamSFO.Magic)
-                throw new FileLoadException("Not a valid PARAM.SFO file");
+                throw new FileLoadException("Unexpected PARAM.SFO file");
 
             // Parse header
             Version = br.ReadUInt32();
@@ -222,15 +222,14 @@ namespace LibIRD
                 switch (Params[i].DataFormat)
                 {
                     case 0x0404:
-                        print.Append(Params[i].IntValue);
-                        print.AppendLine();
+                        print.Append(Params[i].IntValue +Environment.NewLine);
                         break;
                     default:
                         print.AppendLine(Params[i].StringValue);
                         break;
                 }
-                print.Append('\n');
             }
+            print.Append(Environment.NewLine);
 
             // Ensure UTF-8 will display properly
             Console.OutputEncoding = Encoding.UTF8;
