@@ -33,10 +33,11 @@ namespace IRDKit
         }
 
         // IRD Info
+        [Verb("info")]
         public class InfoOptions
         {
-            [Value(0, Required = true, HelpText = "Path to the IRD file to be printed")]
-            public string IRDPath { get; set; }
+            [Value(0, Required = true, HelpText = "Path to the IRD or ISO file to be printed")]
+            public string Path { get; set; }
         }
 
         public static void Main(string[] args)
@@ -105,7 +106,37 @@ namespace IRDKit
                     }
                     break;
                 case InfoOptions info:
-                    //
+                    bool isISO = false;
+                    if (isISO)
+                    {
+                        string filename = "./PS3_DISC.SFB";
+                        if (File.Exists(filename))
+                        {
+                            PS3_DiscSFB ps3_DiscSFB = new(filename);
+                            Console.WriteLine("PS3_DISC.SFB for: " + ps3_DiscSFB.Field["TITLE_ID"]);
+                            ps3_DiscSFB.Print();
+                        }
+                        else
+                        {
+                            Console.WriteLine(filename + " not found");
+                        }
+
+                        filename = "./PARAM.SFO";
+                        if (File.Exists(filename))
+                        {
+                            ParamSFO paramSFO = new(filename);
+                            Console.WriteLine("PARAM.SFO for: " + paramSFO["TITLE_ID"]);
+                            paramSFO.Print();
+                        }
+                        else
+                        {
+                            Console.WriteLine(filename + " not found");
+                        }
+                    }
+                    else
+                    {
+                        IRD.Read(info.Path).Print();
+                    }
                     break;
             }
         }
