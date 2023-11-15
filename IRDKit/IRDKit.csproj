@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <!-- Assembly Properties -->
+    <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>irdkit</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
     <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <Version>0.1.0</Version>
@@ -10,7 +14,7 @@
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
     <Copyright>Copyright (c) 2023 Deterous</Copyright>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!--<PackageReadmeFile>README.md</PackageReadmeFile>-->
     <RepositoryUrl>https://github.com/Deterous/LibIRD</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>ps3 iso ird redump</PackageTags>
@@ -20,12 +24,10 @@
   <ItemGroup>
     <None Include="./README.md" Pack="true" PackagePath=""/>
   </ItemGroup>
-  
+
   <ItemGroup>
-    <PackageReference Include="DiscUtils.Core" Version="0.16.13" />
-    <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
-    <PackageReference Include="DiscUtils.Streams" Version="0.16.13" />
-    <PackageReference Include="System.IO.Hashing" Version="7.0.0" />
+    <ProjectReference Include="..\LibIRD\LibIRD.csproj" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
   </ItemGroup>
 
 </Project>

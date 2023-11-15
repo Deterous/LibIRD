@@ -1285,7 +1285,7 @@ namespace LibIRD
             print.AppendLine("=============");
 
             // Append IRD fields to string builder
-            print.AppendLine($"Magic:        3IRD");
+            print.AppendLine($"Magic:        {Encoding.ASCII.GetString(Magic)}");
             print.AppendLine($"IRD Version:  {Version}");
             print.AppendLine($"Title ID:     {TitleID}");
             print.AppendLine($"Title:        {Title}");

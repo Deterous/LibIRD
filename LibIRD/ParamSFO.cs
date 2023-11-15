@@ -100,6 +100,10 @@ namespace LibIRD
             get
             {
                 int index = Array.FindIndex(Params, param => param.Name ==  key);
+                if (index == -1)
+                    return null;
+                if (Params[index].DataFormat == 0x0404)
+                    return Params[index].IntValue.ToString();
                 return Params[index].StringValue;
             }
         }
