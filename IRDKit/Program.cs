@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using CommandLine;
 using System.Text;
 using System.IO;
+using DiscUtils.Iso9660;
+using DiscUtils;
 
 namespace IRDKit
 {
@@ -53,14 +55,17 @@ namespace IRDKit
             if (errs.IsVersion())
             {
                 // --version
+                Console.WriteLine("Help...");
             }
             else if (errs.IsHelp())
             {
                 // --help
+                Console.WriteLine("Version...");
             }
             else
             {
                 // Parsing error
+                Console.WriteLine("Parsing error");
             }
             return;
         }
@@ -72,6 +77,25 @@ namespace IRDKit
                 case CreateOptions c:
                     Console.OutputEncoding = Encoding.UTF8;
 
+                    // Create new reproducible redump-style IRD with a hex key
+                    if (c.Key != null)
+                    {
+                        try
+                        {
+                            // Get disc key from hex string
+                            byte[] discKey = Convert.FromHexString(c.Key);
+
+                            IRD ird1 = new ReIRD(c.ISOPath, discKey);
+                            ird1.Write(c.IRDPath ?? Path.GetFileNameWithoutExtension(c.ISOPath) + ".ird");
+                            ird1.Print();
+                        }
+                        catch (FileNotFoundException)
+                        {
+                            Console.Error.WriteLine("File not found");
+                        }
+                        break;
+                    }
+
                     // Create new reproducible redump-style IRD with a key file
                     if (c.KeyFile != null)
                     {
@@ -81,13 +105,14 @@ namespace IRDKit
                             byte[] discKey = File.ReadAllBytes(c.KeyFile);
 
                             IRD ird1 = new ReIRD(c.ISOPath, discKey);
-                            ird1.Write(c.IRDPath);
+                            ird1.Write(c.IRDPath ?? Path.GetFileNameWithoutExtension(c.ISOPath) + ".ird");
                             ird1.Print();
                         }
                         catch (FileNotFoundException)
                         {
-                            Console.WriteLine("ERROR: File not found");
+                            Console.Error.WriteLine("File not found");
                         }
+                        break;
                     }
 
                     // Create new reproducible redump-style IRD with a GetKey log
@@ -96,44 +121,57 @@ namespace IRDKit
                         try
                         {
                             IRD ird2 = new ReIRD(c.ISOPath, c.GetKeyLog);
-                            ird2.Write(c.IRDPath);
+                            ird2.Write(c.IRDPath ?? Path.GetFileNameWithoutExtension(c.ISOPath) + ".ird");
                             ird2.Print();
                         }
                         catch (FileNotFoundException)
                         {
-                            Console.WriteLine("ERROR: File not found");
+                            Console.Error.WriteLine("File not found");
                         }
+                        break;
                     }
                     break;
                 case InfoOptions info:
-                    bool isISO = false;
-                    if (isISO)
-                    {
-                        string filename = "./PS3_DISC.SFB";
-                        if (File.Exists(filename))
-                        {
-                            PS3_DiscSFB ps3_DiscSFB = new(filename);
-                            Console.WriteLine("PS3_DISC.SFB for: " + ps3_DiscSFB.Field["TITLE_ID"]);
-                            ps3_DiscSFB.Print();
-                        }
-                        else
-                        {
-                            Console.WriteLine(filename + " not found");
-                        }
+                    string filetype = Path.GetExtension(info.Path);
 
-                        filename = "./PARAM.SFO";
-                        if (File.Exists(filename))
+                    if (String.Compare(filetype, ".iso", StringComparison.OrdinalIgnoreCase) == 0)
+                    {
+                        // Open ISO file for reading
+                        using FileStream fs = new FileStream(info.Path, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(info.Path);
+                        // Validate ISO file stream
+                        if (!CDReader.Detect(fs))
+                            throw new InvalidFileSystemException("Not a valid ISO file");
+                        // Create new ISO reader
+                        CDReader reader = new(fs, true, true);
+
+                        using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read))
                         {
-                            ParamSFO paramSFO = new(filename);
-                            Console.WriteLine("PARAM.SFO for: " + paramSFO["TITLE_ID"]);
-                            paramSFO.Print();
+                            try
+                            {
+                                PS3_DiscSFB ps3_DiscSFB = new(s);
+                                ps3_DiscSFB.Print();
+                            }
+                            catch
+                            {
+                                Console.WriteLine("PS3_DISC.SFB not found");
+                            }
                         }
-                        else
+                            
+
+                        using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
                         {
-                            Console.WriteLine(filename + " not found");
+                            try
+                            {
+                                ParamSFO paramSFO = new(s);
+                                paramSFO.Print();
+                            }
+                            catch
+                            {
+                                Console.WriteLine("./PARAM.SFO not found");
+                            }
                         }
                     }
-                    else
+                    else // Assume it is an IRD file
                     {
                         IRD.Read(info.Path).Print();
                     }

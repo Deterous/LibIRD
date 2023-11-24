@@ -116,6 +116,7 @@ namespace LibIRD
                 print.Append(": ");
                 print.AppendLine(field.Value);
             }
+            print.Append(Environment.NewLine);
 
             // Ensure UTF-8 will display properly
             Console.OutputEncoding = Encoding.UTF8;
