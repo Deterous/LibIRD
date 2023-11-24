@@ -406,8 +406,7 @@ namespace LibIRD
         private protected static byte[] GenerateD1(byte[] key)
         {
             // Validate key
-            if (key == null)
-                throw new ArgumentNullException(nameof(key));
+            ArgumentNullException.ThrowIfNull(key, nameof(key));
             if (key.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
@@ -441,8 +440,7 @@ namespace LibIRD
         private protected static byte[] GenerateDiscKey(byte[] d1)
         {
             // Validate key
-            if (d1 == null)
-                throw new ArgumentNullException(nameof(d1));
+            ArgumentNullException.ThrowIfNull(d1, nameof(d1));
             if (d1.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(d1));
 
@@ -476,7 +474,7 @@ namespace LibIRD
         private protected static byte[] GenerateD2(byte[] d2)
         {
             // Validate id
-            if (d2 == null) throw new ArgumentNullException(nameof(d2));
+            ArgumentNullException.ThrowIfNull(d2, nameof(d2));
             if (d2.Length != 16) throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
@@ -509,8 +507,7 @@ namespace LibIRD
         private protected static byte[] GenerateDiscID(byte[] d2)
         {
             // Validate id
-            if (d2 == null)
-                throw new ArgumentNullException(nameof(d2));
+            ArgumentNullException.ThrowIfNull(d2 , nameof(d2));
             if (d2.Length != 16)
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
@@ -545,8 +542,7 @@ namespace LibIRD
         {
 
             // Validate .getkey.log file path
-            if (getKeyLog == null)
-                throw new ArgumentNullException(nameof(getKeyLog));
+            ArgumentNullException.ThrowIfNull(getKeyLog, nameof(getKeyLog));
             if (!File.Exists(getKeyLog))
                 throw new FileNotFoundException(nameof(getKeyLog));
 
@@ -643,20 +639,22 @@ namespace LibIRD
                 // Redump-style IRDs set the lowest bit of ExtraConfig to 1
                 ExtraConfig |= 0x01;
 
-                // Redump-style IRDs use fields in PS3_DISC.SFB
+                // Redump-style IRDs use fields from PS3_DISC.SFB
                 using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
 
                 // Parse PS3_DISC.SFB file
                 PS3_DiscSFB ps3_DiscSFB = new(s);
-                
+
+                bool title_id_found = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string title_id);
                 // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
-                if (ps3_DiscSFB.Field.ContainsKey("TITLE_ID") && ps3_DiscSFB.Field["TITLE_ID"].Length == 10 && ps3_DiscSFB.Field["TITLE_ID"][4] == '-')
-                    TitleID = string.Concat(ps3_DiscSFB.Field["TITLE_ID"].AsSpan(0, 4), ps3_DiscSFB.Field["TITLE_ID"].AsSpan(5, 5));
+                if (title_id_found && title_id.Length == 10 && title_id[4] == '-')
+                    TitleID = string.Concat(title_id.AsSpan(0, 4), title_id.AsSpan(5, 5));
 
                 // If the version field is present, this is a multi-game disc
                 // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
-                if (ps3_DiscSFB.Field.ContainsKey("VERSION"))
-                    DiscVersion = ps3_DiscSFB.Field["VERSION"];
+                bool version_found = ps3_DiscSFB.Field.TryGetValue("VERSION", out string disc_version);
+                if (version_found)
+                    DiscVersion = disc_version;
             }
 
             // Read PS3 Metadata from PARAM.SFO
