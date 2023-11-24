@@ -1,18 +1,19 @@
-﻿using LibIRD;
+﻿using CommandLine;
+using DiscUtils;
+using DiscUtils.Iso9660;
+using LibIRD;
 using System;
 using System.Collections.Generic;
-using CommandLine;
-using System.Text;
 using System.IO;
-using DiscUtils.Iso9660;
-using DiscUtils;
+using System.IO.Hashing;
+using System.Text;
 
 namespace IRDKit
 {
     internal class Program
     {
         // IRD Creation
-        [Verb("create")]
+        [Verb("create", HelpText = "Create an IRD from an ISO")]
         public class CreateOptions
         {
             [Value(0, Required = true, HelpText = "Path to an ISO file, or directory of ISO files")]
@@ -35,7 +36,7 @@ namespace IRDKit
         }
 
         // IRD Info
-        [Verb("info")]
+        [Verb("info", HelpText = "Print information from an IRD or ISO")]
         public class InfoOptions
         {
             [Value(0, Required = true, HelpText = "Path to the IRD or ISO file to be printed")]
@@ -55,12 +56,10 @@ namespace IRDKit
             if (errs.IsVersion())
             {
                 // --version
-                Console.WriteLine("Help...");
             }
             else if (errs.IsHelp())
             {
                 // --help
-                Console.WriteLine("Version...");
             }
             else
             {
@@ -77,7 +76,7 @@ namespace IRDKit
                 case CreateOptions c:
                     Console.OutputEncoding = Encoding.UTF8;
 
-                    // Create new reproducible redump-style IRD with a hex key
+                    // Create new reproducible redump-style IRD with a given hex key
                     if (c.Key != null)
                     {
                         try
@@ -96,7 +95,7 @@ namespace IRDKit
                         break;
                     }
 
-                    // Create new reproducible redump-style IRD with a key file
+                    // Create new reproducible redump-style IRD with a given key file
                     if (c.KeyFile != null)
                     {
                         try
@@ -115,7 +114,7 @@ namespace IRDKit
                         break;
                     }
 
-                    // Create new reproducible redump-style IRD with a GetKey log
+                    // Create new reproducible redump-style IRD with a given GetKey log
                     if (c.GetKeyLog != null)
                     {
                         try
@@ -130,7 +129,30 @@ namespace IRDKit
                         }
                         break;
                     }
+
+                    // No key provided, try get key from redump.org
+
+                    // Validate ISO path
+                    ArgumentNullException.ThrowIfNull(c.ISOPath);
+
+                    // Check file exists
+                    var iso = new FileInfo(c.ISOPath);
+                    if (!iso.Exists)
+                        throw new FileNotFoundException(nameof(c.ISOPath));
+
+                    // Compute CRC32 hash
+                    byte[] crc32;
+                    using (FileStream fs = File.OpenRead(c.ISOPath))
+                    {
+                        Crc32 hasher = new();
+                        hasher.Append(fs);
+                        crc32 = hasher.GetCurrentHash();
+                        Array.Reverse(crc32);
+                        Console.WriteLine("Automatic key retrieval not yet implemented, search redump.org for: " + Convert.ToHexString(crc32));
+                    }
+
                     break;
+
                 case InfoOptions info:
                     string filetype = Path.GetExtension(info.Path);
 
