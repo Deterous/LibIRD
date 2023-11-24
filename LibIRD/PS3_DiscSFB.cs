@@ -77,7 +77,7 @@ namespace LibIRD
             // Process all field headers
             sfbStream.Seek(0x20, SeekOrigin.Begin);
             string field = Encoding.ASCII.GetString(br.ReadBytes(0x10)).Trim('\0');
-            Field = new Dictionary<string, string> { };
+            Field = [];
             while (field != null && field != "")
             {
                 // Find location of value

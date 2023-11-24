@@ -33,32 +33,32 @@ namespace LibIRD
         /// IRD file signature
         /// </summary>
         /// <remarks>"3IRD"</remarks>
-        private static readonly byte[] Magic = { 0x33, 0x49, 0x52, 0x44 };
+        private static readonly byte[] Magic = [0x33, 0x49, 0x52, 0x44];
 
         /// <summary>
         /// MD5 hash of null
         /// </summary>
-        private static readonly byte[] NullMD5 = new byte[] { 0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e };
+        private static readonly byte[] NullMD5 = [0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e];
 
         /// <summary>
         /// AES CBC Encryption Key for Data 1 (Disc Key)
         /// </summary>
-        private static readonly byte[] D1AesKey = { 0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED };
+        private static readonly byte[] D1AesKey = [0x38, 0x0B, 0xCF, 0x0B, 0x53, 0x45, 0x5B, 0x3C, 0x78, 0x17, 0xAB, 0x4F, 0xA3, 0xBA, 0x90, 0xED];
 
         /// <summary>
         /// AES CBC Initial Value for Data 1 (Disc Key)
         /// </summary>
-        private static readonly byte[] D1AesIV = { 0x69, 0x47, 0x47, 0x72, 0xAF, 0x6F, 0xDA, 0xB3, 0x42, 0x74, 0x3A, 0xEF, 0xAA, 0x18, 0x62, 0x87 };
+        private static readonly byte[] D1AesIV = [0x69, 0x47, 0x47, 0x72, 0xAF, 0x6F, 0xDA, 0xB3, 0x42, 0x74, 0x3A, 0xEF, 0xAA, 0x18, 0x62, 0x87];
 
         /// <summary>
         /// AES CBC Encryption Key for Data 2 (Disc ID)
         /// </summary>
-        private static readonly byte[] D2AesKey = { 0x7C, 0xDD, 0x0E, 0x02, 0x07, 0x6E, 0xFE, 0x45, 0x99, 0xB1, 0xB8, 0x2C, 0x35, 0x99, 0x19, 0xB3 };
+        private static readonly byte[] D2AesKey = [0x7C, 0xDD, 0x0E, 0x02, 0x07, 0x6E, 0xFE, 0x45, 0x99, 0xB1, 0xB8, 0x2C, 0x35, 0x99, 0x19, 0xB3];
 
         /// <summary>
         /// AES CBC Initial Value for Data 2 (Disc ID)
         /// </summary>
-        private static readonly byte[] D2AesIV = { 0x22, 0x26, 0x92, 0x8D, 0x44, 0x03, 0x2F, 0x43, 0x6A, 0xFD, 0x26, 0x7E, 0x74, 0x8B, 0x23, 0x93 };
+        private static readonly byte[] D2AesIV = [0x22, 0x26, 0x92, 0x8D, 0x44, 0x03, 0x2F, 0x43, 0x6A, 0xFD, 0x26, 0x7E, 0x74, 0x8B, 0x23, 0x93];
 
         #endregion
 
@@ -88,7 +88,7 @@ namespace LibIRD
         /// <summary>
         /// Extra Config
         /// </summary>
-        /// <remarks>Reserved, usually set to 0x0000</remarks>
+        /// <remarks>Usually set to 0x0000, set to 0x0001 for redump-style IRDs</remarks>
         public ushort ExtraConfig { get; set; } = 0x0000; // Default to zero
 
         /// <summary>
@@ -217,7 +217,7 @@ namespace LibIRD
         /// The same value stored in PARAM.SFO / VERSION
         /// </summary>
         /// <remarks>5 bytes, ASCII, e.g. "01.20"</remarks>
-        public string GameVersion { get; private set; }
+        public string DiscVersion { get; private set; }
 
         /// <summary>
         /// The same value stored in PARAM.SFO / APP_VER
@@ -312,7 +312,7 @@ namespace LibIRD
             string titleID,
             string title,
             string sysVersion,
-            string gameVersion,
+            string discVersion,
             string appVersion,
             byte[] header,
             byte[] footer,
@@ -329,7 +329,7 @@ namespace LibIRD
             TitleID = titleID;
             Title = title;
             SystemVersion = sysVersion;
-            GameVersion = gameVersion;
+            DiscVersion = discVersion;
             AppVersion = appVersion;
             HeaderLength = (uint)header.Length;
             Header = header;
@@ -476,10 +476,8 @@ namespace LibIRD
         private protected static byte[] GenerateD2(byte[] d2)
         {
             // Validate id
-            if (d2 == null)
-                throw new ArgumentNullException(nameof(d2));
-            if (d2.Length != 16)
-                throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
+            if (d2 == null) throw new ArgumentNullException(nameof(d2));
+            if (d2.Length != 16) throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
@@ -639,33 +637,26 @@ namespace LibIRD
             // New ISO Reader from DiscUtils
             CDReader reader = new(fs, true, true);
 
-            // Redump-style IRDs set the lowest bit of ExtraConfig to 1
-            ExtraConfig |= 0x01;
-
-            // If generating redump-style IRD, read PS3 Metadata from PS3_DISC.SFB
+            // If generating redump-style IRD
             if (redump)
             {
+                // Redump-style IRDs set the lowest bit of ExtraConfig to 1
+                ExtraConfig |= 0x01;
+
+                // Redump-style IRDs use fields in PS3_DISC.SFB
                 using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
 
                 // Parse PS3_DISC.SFB file
                 PS3_DiscSFB ps3_DiscSFB = new(s);
                 
-                // Redump-style IRDs use the TITLE ID
+                // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
                 if (ps3_DiscSFB.Field.ContainsKey("TITLE_ID") && ps3_DiscSFB.Field["TITLE_ID"].Length == 10 && ps3_DiscSFB.Field["TITLE_ID"][4] == '-')
-                {
-                    // Use the TITLE_ID from PS3_DISC.SFB
                     TitleID = string.Concat(ps3_DiscSFB.Field["TITLE_ID"].AsSpan(0, 4), ps3_DiscSFB.Field["TITLE_ID"].AsSpan(5, 5));
-                }
-                else
-                {
-                    // Valid Title ID not found in PS3_DISC.SFB, use the one in PS3_GAME/PARAM.SFO
-                    redump = false;
-                }
 
                 // If the version field is present, this is a multi-game disc
                 // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
                 if (ps3_DiscSFB.Field.ContainsKey("VERSION"))
-                    GameVersion = ps3_DiscSFB.Field["VERSION"];
+                    DiscVersion = ps3_DiscSFB.Field["VERSION"];
             }
 
             // Read PS3 Metadata from PARAM.SFO
@@ -673,12 +664,11 @@ namespace LibIRD
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
-                // Store required values for IRD
-                if (!redump)
-                    TitleID = paramSFO["TITLE_ID"];
+                // If PS3_DISC.SFB did not set TitleID, use PARAM.SFO TITLE_ID
+                TitleID ??= paramSFO["TITLE_ID"];
                 Title = paramSFO["TITLE"];
-                if (GameVersion == null)
-                    GameVersion = paramSFO["VERSION"];
+                // If PS3_DISC.SFB did not set DiscVersion, use PARAM.SFO VERSION
+                DiscVersion ??= paramSFO["VERSION"];
                 AppVersion = paramSFO["APP_VER"];
             }
 
@@ -706,7 +696,7 @@ namespace LibIRD
             // Determine file offsets and hashes
             uint fileCount = FileCount;
             FileCount = 0;
-            ProcessFiles(fs, reader, rootDir);
+            HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
                 throw new InvalidFileSystemException("Unexpected ISO filesystem error: ");
             Array.Sort(FileKeys, FileHashes);
@@ -923,12 +913,13 @@ namespace LibIRD
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="path"></param>
-        private void ProcessFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
+        private void HashFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
         {
             // Process all files in current directory
             foreach (DiscFileInfo fileInfo in dir.GetFiles())
             {
                 string filePath = fileInfo.FullName;
+
                 // Try get the first sector from the file extents instead
                 DiscUtils.Streams.StreamExtent[] fileExtents = reader.PathToExtents(filePath);
                 if (fileExtents == null || fileExtents.Length <= 0)
@@ -992,7 +983,7 @@ namespace LibIRD
             // Recursively process all subfolders of current directory
             foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
             {
-                ProcessFiles(fs, reader, dirInfo);
+                HashFiles(fs, reader, dirInfo);
             }
         }
 
@@ -1081,10 +1072,10 @@ namespace LibIRD
                 bw.Write(systemVersionBuf, 0, 4);
 
                 // PARAM.SFO / VERSION
-                byte[] buf = Encoding.ASCII.GetBytes(GameVersion);
-                byte[] gameVersionBuf = new byte[5];
-                Array.Copy(buf, 0, gameVersionBuf, 0, buf.Length);
-                bw.Write(gameVersionBuf, 0, 5);
+                byte[] buf = Encoding.ASCII.GetBytes(DiscVersion);
+                byte[] discVersionBuf = new byte[5];
+                Array.Copy(buf, 0, discVersionBuf, 0, buf.Length);
+                bw.Write(discVersionBuf, 0, 5);
 
                 // PARAM.SFO / APP_VER
                 buf = Encoding.ASCII.GetBytes(AppVersion);
@@ -1198,7 +1189,7 @@ namespace LibIRD
 
             // Read System, Game, and App Version
             string sysVersion = Encoding.ASCII.GetString(br.ReadBytes(4));
-            string gameVersion = Encoding.ASCII.GetString(br.ReadBytes(5));
+            string discVersion = Encoding.ASCII.GetString(br.ReadBytes(5));
             string appVersion = Encoding.ASCII.GetString(br.ReadBytes(5));
 
             // Read UID (for Version 7)
@@ -1259,7 +1250,7 @@ namespace LibIRD
                            titleID,
                            title,
                            sysVersion,
-                           gameVersion,
+                           discVersion,
                            appVersion,
                            header,
                            footer,
@@ -1290,7 +1281,7 @@ namespace LibIRD
             print.AppendLine($"Title ID:     {TitleID}");
             print.AppendLine($"Title:        {Title}");
             print.AppendLine($"PUP Version:  {SystemVersion}");
-            print.AppendLine($"Game Version: {GameVersion}");
+            print.AppendLine($"Disc Version: {DiscVersion}");
             print.AppendLine($"App Version:  {AppVersion}");
             print.AppendLine($"Regions:      {RegionCount}");
             print.AppendLine($"Files:        {FileCount}");
