@@ -17,3 +17,7 @@ For detailed usage, read more [here](IRDKit).
 ## Using the LibIRD library
 
 LibIRD was originally made for creating reproducible, redump-style IRDs when dumping PS3 discs with [MPF](https://github.com/SabreTools/MPF). If you wish to integrate LibIRD into your own application, read the examples [here](LibIRD).
+
+## Limitations
+
+Currently, LibIRD does not produce correct IRDs for ISOs with non-contiguous files. Therefore, do not consider this library "stable" until v1.0.0 is released.

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 
 namespace LibIRD
 {
@@ -25,6 +26,7 @@ namespace LibIRD
         /// <summary>
         /// A field within the PS3_DISC.SFB file
         /// </summary>
+        /// <remarks>string Key, string Value</remarks>
         public Dictionary<string, string> Field {  get; private set; }
 
         /// <summary>
@@ -35,8 +37,7 @@ namespace LibIRD
         public PS3_DiscSFB(string sfbPath)
         {
             // Validate file path
-            if (sfbPath == null || sfbPath.Length <= 0)
-                throw new ArgumentNullException(nameof(sfbPath));
+            ArgumentNullException.ThrowIfNull(sfbPath, nameof(sfbPath));
 
             // Read file as a stream, and parse file
             using FileStream fs = new(sfbPath, FileMode.Open, FileAccess.Read);
@@ -47,7 +48,6 @@ namespace LibIRD
         /// Parse PS3_DISC.SFB from stream
         /// </summary>
         /// <param name="sfbStream">SFB file stream</param>
-        /// <exception cref="FileLoadException"></exception>
         public PS3_DiscSFB(Stream sfbStream)
         {
             // Parse file stream
@@ -102,27 +102,59 @@ namespace LibIRD
         /// <summary>
         /// Prints formatted parameters extracted from PS3_DISC.SFB to console
         /// </summary>
-        public void Print()
+        /// <param name="printPath">Optionally print to text file</param>
+        public void Print(string printPath = null)
         {
             // Build string from parameters
-            StringBuilder print = new();
-            print.AppendLine("PS3_DISC.SFB Contents:");
-            print.AppendLine("======================");
+            StringBuilder printText = new();
+            printText.AppendLine("PS3_DISC.SFB Contents:");
+            printText.AppendLine("======================");
 
             // Loop through all parameters in PARAM.SFO
             foreach (KeyValuePair<string, string> field in Field)
+                printText.AppendLine(field.Key + ": " + field.Value);
+            // Blank line
+            printText.Append(Environment.NewLine);
+
+            // If no path given, print to console
+            if (printPath == null)
             {
-                print.Append(field.Key);
-                print.Append(": ");
-                print.AppendLine(field.Value);
+                // Ensure UTF-8 will display properly in console
+                Console.OutputEncoding = Encoding.UTF8;
+
+                // Print formatted string to console
+                Console.Write(printText);
             }
-            print.Append(Environment.NewLine);
+            else
+            {
+                // Write data to file
+                File.AppendAllText(printPath, printText.ToString());
+            }
+        }
 
-            // Ensure UTF-8 will display properly
-            Console.OutputEncoding = Encoding.UTF8;
+        /// <summary>
+        /// Prints parameters extracted from PS3_DISC.SFB to a json object
+        /// </summary>
+        /// <param name="jsonPath">Optionally print to json file</param>
+        public void PrintJson(string jsonPath = null)
+        {
+            // Serialise PS3_Disc.SFB data to a JSON object
+            string json = JsonSerializer.Serialize(Field, new JsonSerializerOptions { WriteIndented = true });
 
-            // Print formatted string
-            Console.Write(print);
+            // If no path given, output to console
+            if (jsonPath == null)
+            {
+                // Ensure UTF-8 will display properly in console
+                Console.OutputEncoding = Encoding.UTF8;
+
+                // Print formatted string to console
+                Console.Write(json);
+            }
+            else
+            {
+                // Write to path
+                File.AppendAllText(jsonPath, json);
+            }
         }
     }
 }

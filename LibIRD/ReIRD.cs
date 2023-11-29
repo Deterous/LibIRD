@@ -67,10 +67,9 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="getKeyLog">Path to the GetKey log file</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="FileNotFoundException"></exception>
+        /// <param name="layerbreak">Layerbreak value, in sectors</param>
         /// <exception cref="InvalidDataException"></exception>
-        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true)
+        public ReIRD(string isoPath, string getKeyLog, long? layerbreak = null) : base(isoPath, getKeyLog, true)
         {
             // Generate Unique Identifier using ISO CRC32
             UID = GenerateUID(isoPath);
@@ -80,12 +79,10 @@ namespace LibIRD
 
             // Generate Data 2 using Disc ID
             DiscID = GenerateID(Size);
-            // Check that GetKey log matches expected Disc ID
-            //if (!((ReadOnlySpan<byte>)Data2Key).SequenceEqual(d2))
-            //    throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
 
             // Generate Disc PIC
-            byte[] pic = GeneratePIC(Size);
+            byte[] pic = GeneratePIC(Size, layerbreak * SectorSize);
+
             // Check that GetKey log matches expected PIC
             if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");
@@ -96,10 +93,9 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
+        /// <param name="layerbreak">Layerbreak value, in sectors</param>
         /// <param name="region">Disc Region</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="FileNotFoundException"></exception>
-        public ReIRD(string isoPath, byte[] key, Region region = Region.NONE)
+        public ReIRD(string isoPath, byte[] key, long? layerbreak = null, Region region = Region.NONE)
         {
             // Generate Unique Identifier using ISO CRC32
             UID = GenerateUID(isoPath);
@@ -114,7 +110,7 @@ namespace LibIRD
             DiscID = GenerateID(Size, region);
 
             // Generate Disc PIC
-            PIC = GeneratePIC(Size);
+            PIC = GeneratePIC(Size, layerbreak * SectorSize);
 
             // Generate IRD fields
             GenerateIRD(isoPath, true);
@@ -144,7 +140,7 @@ namespace LibIRD
         /// Generates the PIC data for a given ISO size in bytes
         /// </summary>
         /// <param name="size">Total ISO size in number of bytes</param>
-        /// <param name="layer_break">Layer break value, byte at which disc layers are split across</param>
+        /// <param name="layerbreak">Layer break value, byte at which disc layers are split across</param>
         /// <param name="exactIRD">True to generate a PIC in 3k3y style (0x03 at 115th byte for BD-50 discs)</param>
         /// <exception cref="ArgumentException"></exception>
         private static byte[] GeneratePIC(long size, long? layerbreak = null, bool exactIRD = false)
@@ -171,20 +167,20 @@ namespace LibIRD
              	long l0_start_sector = 1048576;
 			
 			    // Layer 0 end sector = start sector + layerbreak - 2
-			    long l0_end_sector = layer_break + l0_start_sector - 2;
+			    long l0_end_sector = (layer_break / SectorSize) + l0_start_sector - 2;
 			    // Convert end sector location to hex values for PIC
 			    byte[] l0es = [(byte)((l0_end_sector >> 24) & 0xFF),
-						     (byte)((l0_end_sector >> 16) & 0xFF),
-						     (byte)((l0_end_sector >> 8) & 0xFF),
-						     (byte)((l0_end_sector >> 0) & 0xFF)];
+						       (byte)((l0_end_sector >> 16) & 0xFF),
+						       (byte)((l0_end_sector >> 8) & 0xFF),
+						       (byte)((l0_end_sector >> 0) & 0xFF)];
 
                 // Layer 1 start sector = end of disc (0x01EFFFFE) - layerbreak + 2
-                long l1_start_sector = 32505854 - layer_break + 2;
+                long l1_start_sector = 32505854 - (layer_break / SectorSize) + 2;
 			    // Convert start of start sector location to hex values for PIC
 			    byte[] l1ss = [(byte)((l1_start_sector >> 24) & 0xFF),
-						     (byte)((l1_start_sector >> 16) & 0xFF),
-						     (byte)((l1_start_sector >> 8) & 0xFF),
-						     (byte)((l1_start_sector >> 0) & 0xFF)];
+						       (byte)((l1_start_sector >> 16) & 0xFF),
+						       (byte)((l1_start_sector >> 8) & 0xFF),
+						       (byte)((l1_start_sector >> 0) & 0xFF)];
 			
 			    // Total sectors used = num_sectors + Layer 0 start + sectors_between_layers (usually 0x01358C00 - 0x00CA73FE - 3)
 			    long total_sectors = (size / SectorSize) + l0_start_sector + (l1_start_sector - l0_end_sector - 3);
@@ -262,8 +258,7 @@ namespace LibIRD
         private static uint GenerateUID(string isoPath)
         {
             // Validate ISO path
-            if (isoPath == null || isoPath.Length <= 0)
-                throw new ArgumentNullException(nameof(isoPath));
+            ArgumentNullException.ThrowIfNull(isoPath, nameof(isoPath));
 
             // Check file exists
             var iso = new FileInfo(isoPath);
@@ -292,8 +287,7 @@ namespace LibIRD
         private static long CalculateSize(string isoPath)
         {
             // Validate ISO path
-            if (isoPath == null || isoPath.Length <= 0)
-                throw new ArgumentNullException(nameof(isoPath));
+            ArgumentNullException.ThrowIfNull(isoPath, nameof(isoPath));
 
             // Check file exists
             var iso = new FileInfo(isoPath);

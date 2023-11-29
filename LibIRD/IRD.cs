@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace LibIRD
 {
@@ -663,11 +664,11 @@ namespace LibIRD
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
                 // If PS3_DISC.SFB did not set TitleID, use PARAM.SFO TITLE_ID
-                TitleID ??= paramSFO["TITLE_ID"];
-                Title = paramSFO["TITLE"];
+                TitleID ??= paramSFO.Field["TITLE_ID"];
+                Title = paramSFO.Field["TITLE"];
                 // If PS3_DISC.SFB did not set DiscVersion, use PARAM.SFO VERSION
-                DiscVersion ??= paramSFO["VERSION"];
-                AppVersion = paramSFO["APP_VER"];
+                DiscVersion ??= paramSFO.Field["VERSION"];
+                AppVersion = paramSFO.Field["APP_VER"];
             }
 
             // Determine system update version
@@ -1266,38 +1267,93 @@ namespace LibIRD
         /// <summary>
         /// Prints IRD fields to console
         /// </summary>
-        public void Print()
+        /// <param name="printPath">Optional path to save file to</param>
+        public void Print(string printPath = null)
         {
             // Build string from parameters
-            StringBuilder print = new();
-            print.AppendLine("IRD Contents:");
-            print.AppendLine("=============");
+            StringBuilder printText = new();
+            printText.AppendLine("IRD Contents:");
+            printText.AppendLine("=============");
 
             // Append IRD fields to string builder
-            print.AppendLine($"Magic:        {Encoding.ASCII.GetString(Magic)}");
-            print.AppendLine($"IRD Version:  {Version}");
-            print.AppendLine($"Title ID:     {TitleID}");
-            print.AppendLine($"Title:        {Title}");
-            print.AppendLine($"PUP Version:  {SystemVersion}");
-            print.AppendLine($"Disc Version: {DiscVersion}");
-            print.AppendLine($"App Version:  {AppVersion}");
-            print.AppendLine($"Regions:      {RegionCount}");
-            print.AppendLine($"Files:        {FileCount}");
+            printText.AppendLine($"Magic:        {Encoding.ASCII.GetString(Magic)}");
+            printText.AppendLine($"IRD Version:  {Version}");
+            printText.AppendLine($"Title ID:     {TitleID}");
+            printText.AppendLine($"Title:        {Title}");
+            printText.AppendLine($"PUP Version:  {SystemVersion}");
+            printText.AppendLine($"Disc Version: {DiscVersion}");
+            printText.AppendLine($"App Version:  {AppVersion}");
+            printText.AppendLine($"Regions:      {RegionCount}");
+            printText.AppendLine($"Files:        {FileCount}");
             if (ExtraConfig != 0x0000)
-                print.AppendLine($"Extra Config: {ExtraConfig:X4}");
+                printText.AppendLine($"Extra Config: {ExtraConfig:X4}");
             if (Attachments != 0x0000)
-                print.AppendLine($"Attachments:  {Attachments:X4}");
-            print.AppendLine($"Unique ID:    {UID:X8}");
-            print.AppendLine($"Data 1 Key:   {Convert.ToHexString(Data1Key)}");
-            print.AppendLine($"Data 2 Key:   {Convert.ToHexString(Data2Key)}");
-            print.AppendLine($"PIC:          {Convert.ToHexString(PIC)}");
-            print.AppendLine();
+                printText.AppendLine($"Attachments:  {Attachments:X4}");
+            printText.AppendLine($"Unique ID:    {UID:X8}");
+            printText.AppendLine($"Data 1 Key:   {Convert.ToHexString(Data1Key)}");
+            printText.AppendLine($"Data 2 Key:   {Convert.ToHexString(Data2Key)}");
+            printText.AppendLine($"PIC:          {Convert.ToHexString(PIC)}");
+            printText.AppendLine();
 
-            // Ensure UTF-8 will display properly
-            Console.OutputEncoding = Encoding.UTF8;
+            if (printPath == null)
+            {
+                // Ensure UTF-8 will display properly
+                Console.OutputEncoding = Encoding.UTF8;
 
-            // Print formatted string
-            Console.Write(print);
+                // Print formatted string
+                Console.Write(printText);
+            }
+            else
+            {
+                File.WriteAllText(printPath, printText.ToString());
+            }
+        }
+
+
+        /// <summary>
+        /// Prints IRD fields to a json object
+        /// </summary>
+        /// <param name="jsonPath">Optionally print to json file</param>
+        public void PrintJson(string jsonPath = null)
+        {
+            // Build string from parameters
+            StringBuilder json = new();
+
+            // Append IRD fields to string builder
+            json.AppendLine("{");
+            json.AppendLine($"  \"Magic\": \"{Encoding.ASCII.GetString(Magic)}\",");
+            json.AppendLine($"  \"IRD Version\": \"{Version}\",");
+            json.AppendLine($"  \"Title ID\": \"{TitleID}\",");
+            json.AppendLine($"  \"Title\": \"{Title}\",");
+            json.AppendLine($"  \"PUP Version\": \"{SystemVersion}\",");
+            json.AppendLine($"  \"Disc Version\": \"{DiscVersion}\",");
+            json.AppendLine($"  \"App Version\": \"{AppVersion}\",");
+            json.AppendLine($"  \"Regions\": \"{RegionCount}\",");
+            json.AppendLine($"  \"Files\": \"{FileCount}\",");
+            if (ExtraConfig != 0x0000)
+                json.AppendLine($"  \"Extra Config\": \"{ExtraConfig:X4}\",");
+            if (Attachments != 0x0000)
+                json.AppendLine($"  \"Attachments\": \"{Attachments:X4}\",");
+            json.AppendLine($"  \"Unique ID\": \"{UID:X8}");
+            json.AppendLine($"  \"Data 1 Key\": \"{Convert.ToHexString(Data1Key)}\",");
+            json.AppendLine($"  \"Data 2 Key\": \"{Convert.ToHexString(Data2Key)}\",");
+            json.AppendLine($"  \"PIC\": \"{Convert.ToHexString(PIC)}\"");
+            json.AppendLine("}");
+
+            // If no path given, output to console
+            if (jsonPath == null)
+            {
+                // Ensure UTF-8 will display properly in console
+                Console.OutputEncoding = Encoding.UTF8;
+
+                // Print formatted string to console
+                Console.Write(json);
+            }
+            else
+            {
+                // Write to path
+                File.AppendAllText(jsonPath, json.ToString());
+            }
         }
 
         #endregion

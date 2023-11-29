@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 
 namespace LibIRD
 {
@@ -22,91 +24,10 @@ namespace LibIRD
         public uint Version { get; private set; }
 
         /// <summary>
-        /// The location of the first byte of the Key Table
+        /// A field within the PS3_DISC.SFB file
         /// </summary>
-        public uint KeyTableStart { get; private set; }
-
-        /// <summary>
-        /// The location of the first byte of the Data Table
-        /// </summary>
-        public uint DataTableStart { get; private set; }
-
-        /// <summary>
-        /// The number of parameters in the table
-        /// </summary>
-        public uint ParamCount { get; private set; }
-
-        /// <summary>
-        /// Parameter, a single entry in parameter table
-        /// </summary>
-        public class Param
-        {
-            /// <summary>
-            /// Offset of key, relative to KeyTableStart
-            /// </summary>
-            public ushort KeyOffset { get; internal set; }
-
-            /// <summary>
-            /// Format of parameter
-            /// </summary>
-            /// <remarks>0x0400 is string, 0x0404 is uint</remarks>
-            public ushort DataFormat { get; internal set; }
-
-            /// <summary>
-            /// Number of bytes used for parameter
-            /// </summary>
-            public uint DataLength { get; internal set; }
-
-            /// <summary>
-            /// Total number of bytes for parameter
-            /// </summary>
-            /// <remarks>DataTotal - DataLength is padding of 0x00</remarks>
-            public uint DataTotal { get; internal set; }
-
-            /// <summary>
-            /// offset of parameter, relative to DataTableStart
-            /// </summary>
-            public uint DataOffset { get; internal set; }
-
-            /// <summary>
-            /// The name of the parameter
-            /// </summary>
-            public string Name { get; internal set; }
-
-            /// <summary>
-            /// The value of the parameter, if it is a string
-            /// </summary>
-            public string StringValue { get; internal set; } = null;
-
-            /// <summary>
-            /// The value of the parameter, if it is a UInt32
-            /// </summary>
-            public int IntValue { get; internal set; } = 0;
-        }
-
-        /// <summary>
-        /// The parameters in the table
-        /// </summary>
-        /// <remarks><see cref="ParamCount"/> Params in the table</remarks>
-        public Param[] Params {  get; private set; }
-
-        /// <summary>
-        /// String index overloading, gets string value of given key
-        /// </summary>
-        /// <param name="key">Parameter to be retreived</param>
-        /// <returns>The string value of the given key</returns>
-        public string this[string key]
-        {
-            get
-            {
-                int index = Array.FindIndex(Params, param => param.Name ==  key);
-                if (index == -1)
-                    return null;
-                if (Params[index].DataFormat == 0x0404)
-                    return Params[index].IntValue.ToString();
-                return Params[index].StringValue;
-            }
-        }
+        /// <remarks>string Key, string Value</remarks>
+        public Dictionary<string, string> Field { get; private set; }
 
         /// <summary>
         /// Constructor using a PARAM.SFO file stream
@@ -151,95 +72,114 @@ namespace LibIRD
 
             // Parse header
             Version = br.ReadUInt32();
-            KeyTableStart = br.ReadUInt32();
-            DataTableStart = br.ReadUInt32();
-            ParamCount = br.ReadUInt32();
+            uint keyTableStart = br.ReadUInt32();
+            uint dataTableStart = br.ReadUInt32();
+            uint paramCount = br.ReadUInt32();
 
             // Parse parameter metadata
-            Params = new Param[ParamCount];
-            for (int i = 0; i < ParamCount; i++)
+            ushort[] keyOffset = new ushort[paramCount];
+            uint[] dataFormat = new uint[paramCount];
+            uint[] dataLength = new uint[paramCount];
+            uint[] dataTotal = new uint[paramCount];
+            uint[] dataOffset = new uint[paramCount];
+            for (int i = 0; i < paramCount; i++)
             {
-                Params[i] = new Param
-                {
-                    KeyOffset = br.ReadUInt16(),
-                    DataFormat = br.ReadUInt16(),
-                    DataLength = br.ReadUInt32(),
-                    DataTotal = br.ReadUInt32(),
-                    DataOffset = br.ReadUInt32()
-                };
+                keyOffset[i] = br.ReadUInt16();
+                dataFormat[i] = br.ReadUInt16();
+                dataLength[i] = br.ReadUInt32();
+                dataTotal[i] = br.ReadUInt32();
+                dataOffset[i] = br.ReadUInt32();
             }
 
             // Parse parameters
-            for (int i = 0; i < ParamCount; i++)
+            Field = [];
+            for (int i = 0; i < paramCount; i++)
             {
                 // Move stream to ith key
-                sfoStream.Position = KeyTableStart + Params[i].KeyOffset;
+                sfoStream.Position = keyTableStart + keyOffset[i];
 
                 // Determine ith key length
-                uint keyLen = ((i == ParamCount - 1) ? DataTableStart - KeyTableStart : Params[i + 1].KeyOffset)
-                            - Params[i].KeyOffset;
+                uint keyLen = ((i == paramCount - 1) ? dataTableStart - keyTableStart : keyOffset[i + 1])
+                              - keyOffset[i];
 
                 // Read ith key name
-                Params[i].Name = Encoding.ASCII.GetString(br.ReadBytes((int) keyLen)).TrimEnd('\0');
+                string key = Encoding.ASCII.GetString(br.ReadBytes((int) keyLen)).TrimEnd('\0');
 
                 // Move stream to ith data
-                sfoStream.Position = DataTableStart + Params[i].DataOffset;
+                sfoStream.Position = dataTableStart + dataOffset[i];
 
                 // Read ith data, based on data format
-                switch (Params[i].DataFormat)
+                Field[key] = dataFormat[i] switch
                 {
-                    case 0x0400: // Non-null-terminated UTF-8 String
-                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength));
-                        break;
-                    case 0x0402: // Null-terminated UTF-8 String
-                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
-                        break;
-                    case 0x0404: // Integer
-                                 //if (Params[i].DataLength != 4)
-                                 //throw new ArgumentException("Integer parameter not 4 bytes?");
-                        Params[i].IntValue = br.ReadInt32();
-                        break;
-                    default: // Unknown data format, assume null-terminated string
-                        Params[i].StringValue = Encoding.UTF8.GetString(br.ReadBytes((int)Params[i].DataLength)).TrimEnd('\0');
-                        break;
-                }
+                    // Non-null-terminated UTF-8 String
+                    0x0004 => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])),
+                    // Null-terminated UTF-8 String
+                    0x0204 => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])).TrimEnd('\0'),
+                    // Integer
+                    0x0404 => br.ReadInt32().ToString(),
+                    // Unknown data format, assume null-terminated string
+                    _ => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])).TrimEnd('\0'),
+                };
             }
         }
 
         /// <summary>
         /// Prints formatted parameters extracted from PARAM.SFO to console
         /// </summary>
-        public void Print()
+        /// <param name="printPath">Optionally print to text file</param>
+        public void Print(string printPath = null)
         {
             // Build string from parameters
-            StringBuilder print = new();
-            print.AppendLine("PARAM.SFO Contents:");
-            print.AppendLine("====================");
+            StringBuilder printText = new();
+            printText.AppendLine("PARAM.SFO Contents:");
+            printText.AppendLine("====================");
 
             // Loop through all parameters in PARAM.SFO
-            for (int i = 0; i < ParamCount; i++)
+            foreach (KeyValuePair<string, string> field in Field)
+                printText.AppendLine(field.Key + ": " + field.Value);
+            // Blank line
+            printText.Append(Environment.NewLine);
+
+            // If no path given, print to console
+            if (printPath == null)
             {
-                print.Append(Params[i].Name);
-                print.Append(' ');
-                for (int j = Params[i].Name.Length; j < 20; j++)
-                    print.Append(' ');
-                switch (Params[i].DataFormat)
-                {
-                    case 0x0404:
-                        print.Append(Params[i].IntValue +Environment.NewLine);
-                        break;
-                    default:
-                        print.AppendLine(Params[i].StringValue);
-                        break;
-                }
+                // Ensure UTF-8 will display properly in console
+                Console.OutputEncoding = Encoding.UTF8;
+
+                // Print formatted string to console
+                Console.Write(printText);
             }
-            print.Append(Environment.NewLine);
+            else
+            {
+                // Write data to file
+                File.AppendAllText(printPath, printText.ToString());
+            }
+        }
 
-            // Ensure UTF-8 will display properly
-            Console.OutputEncoding = Encoding.UTF8;
+        /// <summary>
+        /// Prints parameters extracted from PARAM.SFO to a json object
+        /// </summary>
+        /// <param name="jsonPath">Optionally print to json file</param>
+        public void PrintJson(string jsonPath = null)
+        {
+            // Serialise PS3_Disc.SFB data to a JSON object
+            string json = JsonSerializer.Serialize(Field, new JsonSerializerOptions { WriteIndented = true });
 
-            // Print formatted string
-            Console.Write(print);
+            // If no path given, output to console
+            if (jsonPath == null)
+            {
+                // Ensure UTF-8 will display properly in console
+                Console.OutputEncoding = Encoding.UTF8;
+
+                // Print formatted string to console
+                Console.Write(json);
+            }
+            else
+            {
+                // Write to path
+                File.AppendAllText(jsonPath, json);
+            }
+
         }
     }
 }
