@@ -126,7 +126,13 @@ namespace IRDKit
                         // Create new ISO reader
                         CDReader reader = new(fs, true, true);
 
-                        File.WriteAllText(opt.OutPath, "{\n");
+                        if (opt.Json)
+                        {
+                            if (opt.OutPath != null)
+                                File.WriteAllText(opt.OutPath, "{\n");
+                            else
+                                Console.WriteLine('{');
+                        }
 
                         // Write PS3_DISC.SFB info
                         using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read))
@@ -136,9 +142,15 @@ namespace IRDKit
                                 PS3_DiscSFB ps3_DiscSFB = new(s);
                                 if (opt.Json)
                                 {
-                                    File.AppendAllText(opt.OutPath, "\"PS3_DISC.SFB\": ");
+                                    if (opt.OutPath != null)
+                                        File.AppendAllText(opt.OutPath, "\"PS3_DISC.SFB\": ");
+                                    else
+                                        Console.Write("\"PS3_DISC.SFB\": ");
                                     ps3_DiscSFB.PrintJson(opt.OutPath);
-                                    File.AppendAllText(opt.OutPath, ",");
+                                    if (opt.OutPath != null)
+                                        File.AppendAllText(opt.OutPath, ",\n");
+                                    else
+                                        Console.WriteLine(',');
                                 }
                                 else
                                     ps3_DiscSFB.Print(opt.OutPath);
@@ -157,7 +169,10 @@ namespace IRDKit
                                 ParamSFO paramSFO = new(s);
                                 if (opt.Json)
                                 {
-                                    File.AppendAllText(opt.OutPath, "\n\"PARAM.SFO\": ");
+                                    if (opt.OutPath != null)
+                                        File.AppendAllText(opt.OutPath, "\"PARAM.SFO\": ");
+                                    else
+                                        Console.Write("\"PARAM.SFO\": ");
                                     paramSFO.PrintJson(opt.OutPath);
                                 }
                                 else
@@ -169,7 +184,13 @@ namespace IRDKit
                             }
                         }
 
-                        File.AppendAllText(opt.OutPath, "\n}");
+                        if (opt.Json)
+                        {
+                            if (opt.OutPath != null)
+                                File.AppendAllText(opt.OutPath, "\n}\n");
+                            else
+                                Console.WriteLine("\n}");
+                        }
                     }
                     else
                     {

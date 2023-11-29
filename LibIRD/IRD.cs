@@ -1334,7 +1334,7 @@ namespace LibIRD
                 json.AppendLine($"  \"Extra Config\": \"{ExtraConfig:X4}\",");
             if (Attachments != 0x0000)
                 json.AppendLine($"  \"Attachments\": \"{Attachments:X4}\",");
-            json.AppendLine($"  \"Unique ID\": \"{UID:X8}");
+            json.AppendLine($"  \"Unique ID\": \"{UID:X8}\",");
             json.AppendLine($"  \"Data 1 Key\": \"{Convert.ToHexString(Data1Key)}\",");
             json.AppendLine($"  \"Data 2 Key\": \"{Convert.ToHexString(Data2Key)}\",");
             json.AppendLine($"  \"PIC\": \"{Convert.ToHexString(PIC)}\"");

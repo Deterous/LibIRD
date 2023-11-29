@@ -132,7 +132,7 @@ namespace LibIRD
             // Build string from parameters
             StringBuilder printText = new();
             printText.AppendLine("PARAM.SFO Contents:");
-            printText.AppendLine("====================");
+            printText.AppendLine("===================");
 
             // Loop through all parameters in PARAM.SFO
             foreach (KeyValuePair<string, string> field in Field)
