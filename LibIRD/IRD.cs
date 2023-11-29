@@ -365,13 +365,12 @@ namespace LibIRD
         /// <param name="discKey">Disc Key, byte array of length 16</param>
         /// <param name="discID">Disc ID, byte array of length 16</param>
         /// <param name="discPIC">Disc PIC, byte array of length 115</param>
-        /// <param name="redump">True if redump-style IRD</param>
+        /// <param name="redump">True if redump-style IRD (default: false)</param>
         public IRD(string isoPath, byte[] discKey, byte[] discID, byte[] discPIC, bool redump = false)
         {
             // Parse ISO, Disc Key, Disc ID, and PIC
             DiscKey = discKey;
-            GenerateD1(discKey);
-            GenerateD2(discID);
+            DiscID = discID;
             PIC = discPIC;
 
             // Generate IRD files from ISO

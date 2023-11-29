@@ -95,7 +95,7 @@ namespace LibIRD
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
         /// <param name="layerbreak">Layerbreak value, in sectors</param>
         /// <param name="region">Disc Region</param>
-        public ReIRD(string isoPath, byte[] key, long? layerbreak = null, Region region = Region.NONE)
+        public ReIRD(string isoPath, byte[] key, long? layerbreak = null, Region region = Region.NONE) : base()
         {
             // Generate Unique Identifier using ISO CRC32
             UID = GenerateUID(isoPath);
