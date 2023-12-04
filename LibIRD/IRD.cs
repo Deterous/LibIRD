@@ -6,7 +6,6 @@ using System.IO.Compression;
 using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 
 namespace LibIRD
 {
@@ -1267,11 +1266,14 @@ namespace LibIRD
         /// Prints IRD fields to console
         /// </summary>
         /// <param name="printPath">Optional path to save file to</param>
-        public void Print(string printPath = null)
+        public void Print(string printPath = null, string irdName = null)
         {
             // Build string from parameters
             StringBuilder printText = new();
-            printText.AppendLine("IRD Contents:");
+            if (irdName == null)
+                printText.AppendLine("IRD Contents:");
+            else
+                printText.AppendLine($"IRD Contents: {irdName}");
             printText.AppendLine("=============");
 
             // Append IRD fields to string builder
@@ -1304,7 +1306,7 @@ namespace LibIRD
             }
             else
             {
-                File.WriteAllText(printPath, printText.ToString());
+                File.AppendAllText(printPath, printText.ToString());
             }
         }
 
@@ -1313,7 +1315,7 @@ namespace LibIRD
         /// Prints IRD fields to a json object
         /// </summary>
         /// <param name="jsonPath">Optionally print to json file</param>
-        public void PrintJson(string jsonPath = null)
+        public void PrintJson(string jsonPath = null, bool single = true)
         {
             // Build string from parameters
             StringBuilder json = new();
@@ -1337,7 +1339,10 @@ namespace LibIRD
             json.AppendLine($"  \"Data 1 Key\": \"{Convert.ToHexString(Data1Key)}\",");
             json.AppendLine($"  \"Data 2 Key\": \"{Convert.ToHexString(Data2Key)}\",");
             json.AppendLine($"  \"PIC\": \"{Convert.ToHexString(PIC)}\"");
-            json.AppendLine("}");
+            if (single)
+                json.AppendLine("}");
+            else
+                json.AppendLine("},");
 
             // If no path given, output to console
             if (jsonPath == null)
