@@ -302,53 +302,51 @@ namespace IRDKit
             }
 
             // Write PS3_DISC.SFB info
-            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read))
+            try
             {
-                try
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+                PS3_DiscSFB ps3_DiscSFB = new(s);
+                if (json)
                 {
-                    PS3_DiscSFB ps3_DiscSFB = new(s);
-                    if (json)
-                    {
-                        if (outPath != null)
-                            File.AppendAllText(outPath, "\"PS3_DISC.SFB\": ");
-                        else
-                            Console.Write("\"PS3_DISC.SFB\": ");
-                        ps3_DiscSFB.PrintJson(outPath);
-                        if (outPath != null)
-                            File.AppendAllText(outPath, ",\n");
-                        else
-                            Console.WriteLine(',');
-                    }
+                    if (outPath != null)
+                        File.AppendAllText(outPath, "\"PS3_DISC.SFB\": ");
                     else
-                        ps3_DiscSFB.Print(outPath);
+                        Console.Write("\"PS3_DISC.SFB\": ");
+                    ps3_DiscSFB.PrintJson(outPath);
+                    if (outPath != null)
+                        File.AppendAllText(outPath, ",\n");
+                    else
+                        Console.WriteLine(',');
                 }
-                catch
-                {
-                    Console.WriteLine("PS3_DISC.SFB not found");
-                }
+                else
+                    ps3_DiscSFB.Print(outPath);
+            }
+            catch (FileNotFoundException)
+            {
+                if (!json)
+                    Console.WriteLine("PS3_DISC.SFB not found. Not a valid PS3 ISO?");
             }
 
             // Write PARAM.SFO info
-            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
+            try
             {
-                try
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
+                ParamSFO paramSFO = new(s);
+                if (json)
                 {
-                    ParamSFO paramSFO = new(s);
-                    if (json)
-                    {
-                        if (outPath != null)
-                            File.AppendAllText(outPath, "\"PARAM.SFO\": ");
-                        else
-                            Console.Write("\"PARAM.SFO\": ");
-                        paramSFO.PrintJson(outPath);
-                    }
+                    if (outPath != null)
+                        File.AppendAllText(outPath, "\"PARAM.SFO\": ");
                     else
-                        paramSFO.Print(outPath);
+                        Console.Write("\"PARAM.SFO\": ");
+                    paramSFO.PrintJson(outPath);
                 }
-                catch
-                {
-                    Console.WriteLine("PS3_GAME\\PARAM.SFO not found");
-                }
+                else
+                    paramSFO.Print(outPath);
+            }
+            catch (FileNotFoundException)
+            {
+                if (!json)
+                    Console.WriteLine("PS3_GAME\\PARAM.SFO not found. Not a valid PS3 ISO?");
             }
 
             // End JSON object
