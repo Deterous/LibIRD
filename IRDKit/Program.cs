@@ -135,7 +135,8 @@ namespace IRDKit
                 case InfoOptions opt:
 
                     // Clear the output file path if it exists
-                    File.Delete(opt.OutPath);
+                    if (opt.OutPath != null)
+                        File.Delete(opt.OutPath);
 
                     // If directory, search for all ISOs in current directory
                     if (Directory.Exists(opt.InPath))
