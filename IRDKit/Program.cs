@@ -178,16 +178,14 @@ namespace IRDKit
 
                         // Print info from all IRDs
                         foreach (string file in irdFiles)
-                        {
                             PrintInfo(file, opt.Json, false, opt.OutPath);
-                        }
 
                         // Print info from all ISOs
                         foreach (string file in isoFiles)
                         {
                             try
                             {
-                                PrintISO(file, opt.Json);
+                                PrintISO(file, opt.Json, opt.OutPath);
                             }
                             catch (InvalidFileSystemException)
                             {
@@ -237,7 +235,7 @@ namespace IRDKit
             {
                 try
                 {
-                    PrintISO(inPath, json);
+                    PrintISO(inPath, json, outPath);
                     return;
                 }
                 catch (InvalidFileSystemException)
@@ -324,7 +322,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine("PS3_DISC.SFB not found. Not a valid PS3 ISO?");
+                    Console.WriteLine($"PS3_DISC.SFB not found in {isoPath}. Not a valid PS3 ISO?");
             }
 
             // Write PARAM.SFO info
@@ -346,7 +344,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine("PS3_GAME\\PARAM.SFO not found. Not a valid PS3 ISO?");
+                    Console.WriteLine($"PS3_GAME\\PARAM.SFO not found in {isoPath}. Not a valid PS3 ISO?");
             }
 
             // End JSON object
