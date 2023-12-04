@@ -147,7 +147,7 @@ namespace IRDKit
                         if (opt.Recurse)
                         {
                             if (opt.InPath == ".")
-                                Console.WriteLine($"Recursively searching for IRDs and ISOs in current directory");
+                                Console.WriteLine($"Recursively searching for IRDs and ISOs in current directory\n");
                             else
                                 Console.WriteLine($"Recursively searching for IRDs and ISOs in {opt.InPath}");
                             irdFiles = Directory.EnumerateFiles(opt.InPath, "*.ird", SearchOption.AllDirectories);
@@ -156,7 +156,7 @@ namespace IRDKit
                         else
                         {
                             if (opt.InPath == ".")
-                                Console.WriteLine($"Searching for IRDs and ISOs in current directory");
+                                Console.WriteLine($"Searching for IRDs and ISOs in current directory\n");
                             else
                                 Console.WriteLine($"Searching for IRDs and ISOs in {opt.InPath}");
                             irdFiles = Directory.EnumerateFiles(opt.InPath, "*.ird", SearchOption.TopDirectoryOnly);
@@ -191,7 +191,7 @@ namespace IRDKit
                             {
                                 // Not a valid ISO file despite extension, assume file is an IRD
                                 if (!opt.Json)
-                                    Console.WriteLine($"{file} is not a valid ISO file");
+                                    Console.WriteLine($"{file} is not a valid ISO file\n");
                             }
                         }
 
@@ -249,26 +249,29 @@ namespace IRDKit
             {
                 if (json)
                 {
+                    IRD ird = IRD.Read(inPath);
                     if (outPath != null)
                         File.AppendAllText(outPath, $"\"{inPath}\": ");
                     else
                         Console.Write($"\"{inPath}\": ");
-                    IRD.Read(inPath).PrintJson(outPath, single);
+                    ird.PrintJson(outPath, single);
                 }
                 else
                     IRD.Read(inPath).Print(outPath, inPath);
 
-                if (isISO)
-                    Console.WriteLine($"{inPath} was a valid IRD despite .iso extension");
+                if (json)
+                    return;
                 return;
             }
             catch (InvalidDataException)
             {
                 // Not a valid IRD file despite extension, give up
+                if (json)
+                    return;
                 if (isISO)
-                    Console.WriteLine($"{inPath} is not a valid ISO file");
+                    Console.WriteLine($"{inPath} is not a valid ISO file\n");
                 else
-                    Console.WriteLine($"{inPath} is not a valid IRD file");
+                    Console.WriteLine($"{inPath} is not a valid IRD file\n");
             }
         }
 
@@ -290,15 +293,6 @@ namespace IRDKit
             // Create new ISO reader
             using CDReader reader = new(fs, true, true);
 
-            // Begin JSON object
-            if (json)
-            {
-                if (outPath != null)
-                    File.AppendAllText(outPath, $"\"{isoPath}\": {{\n");
-                else
-                    Console.WriteLine($"\"{isoPath}\": {{");
-            }
-
             // Write PS3_DISC.SFB info
             try
             {
@@ -306,6 +300,16 @@ namespace IRDKit
                 PS3_DiscSFB ps3_DiscSFB = new(s);
                 if (json)
                 {
+                    // Begin JSON object
+                    if (json)
+                    {
+                        if (outPath != null)
+                            File.AppendAllText(outPath, $"\"{isoPath}\": {{\n");
+                        else
+                            Console.WriteLine($"\"{isoPath}\": {{");
+                    }
+
+                    // Print PS3_DISC.SFB info
                     if (outPath != null)
                         File.AppendAllText(outPath, "\"PS3_DISC.SFB\": ");
                     else
@@ -322,7 +326,8 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine($"PS3_DISC.SFB not found in {isoPath}. Not a valid PS3 ISO?");
+                    Console.WriteLine($"{isoPath} not a valid PS3 ISO file\n");
+                return;
             }
 
             // Write PARAM.SFO info
@@ -344,7 +349,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine($"PS3_GAME\\PARAM.SFO not found in {isoPath}. Not a valid PS3 ISO?");
+                    Console.WriteLine($"PS3_GAME\\PARAM.SFO not found in {isoPath}\n");
             }
 
             // End JSON object
