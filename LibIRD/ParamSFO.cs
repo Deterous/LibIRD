@@ -127,11 +127,14 @@ namespace LibIRD
         /// Prints formatted parameters extracted from PARAM.SFO to console
         /// </summary>
         /// <param name="printPath">Optionally print to text file</param>
-        public void Print(string printPath = null)
+        public void Print(string printPath = null, string isoName = null)
         {
             // Build string from parameters
             StringBuilder printText = new();
-            printText.AppendLine("PARAM.SFO Contents:");
+            if (isoName != null)
+                printText.AppendLine($"PARAM.SFO Contents: {isoName}");
+            else
+                printText.AppendLine("PARAM.SFO Contents:");
             printText.AppendLine("===================");
 
             // Loop through all parameters in PARAM.SFO

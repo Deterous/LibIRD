@@ -177,15 +177,21 @@ namespace IRDKit
                         }
 
                         // Print info from all IRDs
+                        bool noISO = !isoFiles.Any();
+                        string lastIRD = irdFiles.Last();
                         foreach (string file in irdFiles)
-                            PrintInfo(file, opt.Json, false, opt.OutPath);
+                        {
+                            PrintInfo(file, opt.Json, (noISO && file.Equals(lastIRD)), opt.OutPath);
+                        }
+
 
                         // Print info from all ISOs
+                        string lastISO = isoFiles.Last();
                         foreach (string file in isoFiles)
                         {
                             try
                             {
-                                PrintISO(file, opt.Json, opt.OutPath);
+                                PrintISO(file, opt.Json, file.Equals(lastISO), opt.OutPath);
                             }
                             catch (InvalidFileSystemException)
                             {
@@ -235,7 +241,7 @@ namespace IRDKit
             {
                 try
                 {
-                    PrintISO(inPath, json, outPath);
+                    PrintISO(inPath, json, single, outPath);
                     return;
                 }
                 catch (InvalidFileSystemException)
@@ -251,13 +257,13 @@ namespace IRDKit
                 {
                     IRD ird = IRD.Read(inPath);
                     if (outPath != null)
-                        File.AppendAllText(outPath, $"\"{inPath}\": ");
+                        File.AppendAllText(outPath, $"\"{Path.GetFileName(inPath)}\": ");
                     else
-                        Console.Write($"\"{inPath}\": ");
+                        Console.Write($"\"{Path.GetFileName(inPath)}\": ");
                     ird.PrintJson(outPath, single);
                 }
                 else
-                    IRD.Read(inPath).Print(outPath, inPath);
+                    IRD.Read(inPath).Print(outPath, Path.GetFileName(inPath));
 
                 if (json)
                     return;
@@ -283,7 +289,7 @@ namespace IRDKit
         /// <param name="outPath">File to output info to</param>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidFileSystemException"></exception>
-        public static void PrintISO(string isoPath, bool json, string outPath = null)
+        public static void PrintISO(string isoPath, bool json, bool single = true, string outPath = null)
         {
             // Open ISO file for reading
             using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
@@ -304,9 +310,9 @@ namespace IRDKit
                     if (json)
                     {
                         if (outPath != null)
-                            File.AppendAllText(outPath, $"\"{isoPath}\": {{\n");
+                            File.AppendAllText(outPath, $"\"{Path.GetFileName(isoPath)}\": {{\n");
                         else
-                            Console.WriteLine($"\"{isoPath}\": {{");
+                            Console.WriteLine($"\"{Path.GetFileName(isoPath)}\": {{");
                     }
 
                     // Print PS3_DISC.SFB info
@@ -321,7 +327,7 @@ namespace IRDKit
                         Console.WriteLine(',');
                 }
                 else
-                    ps3_DiscSFB.Print(outPath);
+                    ps3_DiscSFB.Print(outPath, Path.GetFileName(isoPath));
             }
             catch (FileNotFoundException)
             {
@@ -344,7 +350,7 @@ namespace IRDKit
                     paramSFO.PrintJson(outPath);
                 }
                 else
-                    paramSFO.Print(outPath);
+                    paramSFO.Print(outPath, Path.GetFileName(isoPath));
             }
             catch (FileNotFoundException)
             {
@@ -355,10 +361,20 @@ namespace IRDKit
             // End JSON object
             if (json)
             {
-                if (outPath != null)
-                    File.AppendAllText(outPath, "\n},\n");
+                if (single)
+                {
+                    if (outPath != null)
+                        File.AppendAllText(outPath, "\n}\n");
+                    else
+                        Console.WriteLine("\n}");
+                }
                 else
-                    Console.WriteLine("\n},");
+                {
+                    if (outPath != null)
+                        File.AppendAllText(outPath, "\n},\n");
+                    else
+                        Console.WriteLine("\n},");
+                }
             }
         }
 
