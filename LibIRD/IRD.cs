@@ -663,7 +663,7 @@ namespace LibIRD
                 ParamSFO paramSFO = new(s);
 
                 // If PS3_DISC.SFB did not set TitleID, use PARAM.SFO TITLE_ID
-                if (TitleID != null)
+                if (TitleID == null)
                 {
                     bool titleIDFound = paramSFO.Field.TryGetValue("TITLE_ID", out string titleID);
                     if (titleIDFound)
@@ -677,7 +677,7 @@ namespace LibIRD
                 Title = titleFound ? title : String.Empty;
 
                 // If PS3_DISC.SFB did not set DiscVersion, try use PARAM.SFO VERSION
-                if (DiscVersion != null)
+                if (DiscVersion == null)
                 {
                     bool discVersionFound = paramSFO.Field.TryGetValue("VERSION", out string discVersion);
                     if (discVersionFound)
