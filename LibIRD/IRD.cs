@@ -644,16 +644,16 @@ namespace LibIRD
                 // Parse PS3_DISC.SFB file
                 PS3_DiscSFB ps3_DiscSFB = new(s);
 
-                bool title_id_found = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string title_id);
+                bool titleIDFound = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string titleID);
                 // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
-                if (title_id_found && title_id.Length == 10 && title_id[4] == '-')
-                    TitleID = string.Concat(title_id.AsSpan(0, 4), title_id.AsSpan(5, 5));
+                if (titleIDFound && titleID.Length == 10 && titleID[4] == '-')
+                    TitleID = string.Concat(titleID.AsSpan(0, 4), titleID.AsSpan(5, 5));
 
                 // If the version field is present, this is a multi-game disc
                 // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
-                bool version_found = ps3_DiscSFB.Field.TryGetValue("VERSION", out string disc_version);
-                if (version_found)
-                    DiscVersion = disc_version;
+                bool discVersionFound = ps3_DiscSFB.Field.TryGetValue("VERSION", out string discVersion);
+                if (discVersionFound)
+                    DiscVersion = discVersion;
             }
 
             // Read PS3 Metadata from PARAM.SFO
@@ -661,12 +661,58 @@ namespace LibIRD
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
+
                 // If PS3_DISC.SFB did not set TitleID, use PARAM.SFO TITLE_ID
-                TitleID ??= paramSFO.Field["TITLE_ID"];
-                Title = paramSFO.Field["TITLE"];
-                // If PS3_DISC.SFB did not set DiscVersion, use PARAM.SFO VERSION
-                DiscVersion ??= paramSFO.Field["VERSION"];
-                AppVersion = paramSFO.Field["APP_VER"];
+                if (TitleID != null)
+                {
+                    bool titleIDFound = paramSFO.Field.TryGetValue("TITLE_ID", out string titleID);
+                    if (titleIDFound)
+                    {
+                        if (titleID.Length == 9)
+                            TitleID = titleID;
+                        else
+                            TitleID = titleID.PadRight(9, '\0')[..9];
+                    }
+                    else
+                    {
+                        TitleID = "\0\0\0\0\0\0\0\0\0";
+                    }
+                }
+
+                // Try use Title from PARAM.SFO
+                bool titleFound = paramSFO.Field.TryGetValue("TITLE", out string title);
+                Title = titleFound ? title : String.Empty;
+
+                // If PS3_DISC.SFB did not set DiscVersion, try use PARAM.SFO VERSION
+                if (DiscVersion != null)
+                {
+                    bool discVersionFound = paramSFO.Field.TryGetValue("VERSION", out string discVersion);
+                    if (discVersionFound)
+                    {
+                        if (discVersion.Length == 5)
+                            DiscVersion = discVersion;
+                        else
+                            DiscVersion = discVersion.PadRight(5, '\0')[..5];
+                    }
+                    else
+                    {
+                        DiscVersion = "\0\0\0\0\0";
+                    }
+                }
+
+                // Try use App Version from PARAM.SFO 
+                bool appVersionFound = paramSFO.Field.TryGetValue("APP_VER", out string appVersion);
+                if (appVersionFound)
+                {
+                    if (appVersion.Length == 5)
+                        AppVersion = appVersion;
+                    else
+                        AppVersion = appVersion.PadRight(5, '\0')[..5];
+                }
+                else
+                {
+                    AppVersion = "\0\0\0\0\0";
+                }
             }
 
             // Determine system update version
