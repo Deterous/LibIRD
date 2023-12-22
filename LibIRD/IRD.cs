@@ -667,16 +667,9 @@ namespace LibIRD
                 {
                     bool titleIDFound = paramSFO.Field.TryGetValue("TITLE_ID", out string titleID);
                     if (titleIDFound)
-                    {
-                        if (titleID.Length == 9)
-                            TitleID = titleID;
-                        else
-                            TitleID = titleID.PadRight(9, '\0')[..9];
-                    }
+                        TitleID = titleID.Length == 9 ? titleID : titleID.PadRight(9, '\0')[..9];
                     else
-                    {
                         TitleID = "\0\0\0\0\0\0\0\0\0";
-                    }
                 }
 
                 // Try use Title from PARAM.SFO
@@ -688,31 +681,17 @@ namespace LibIRD
                 {
                     bool discVersionFound = paramSFO.Field.TryGetValue("VERSION", out string discVersion);
                     if (discVersionFound)
-                    {
-                        if (discVersion.Length == 5)
-                            DiscVersion = discVersion;
-                        else
-                            DiscVersion = discVersion.PadRight(5, '\0')[..5];
-                    }
+                        DiscVersion = discVersion.Length == 5 ? discVersion : discVersion.PadRight(5, '\0')[..5];
                     else
-                    {
                         DiscVersion = "\0\0\0\0\0";
-                    }
                 }
 
                 // Try use App Version from PARAM.SFO 
                 bool appVersionFound = paramSFO.Field.TryGetValue("APP_VER", out string appVersion);
                 if (appVersionFound)
-                {
-                    if (appVersion.Length == 5)
-                        AppVersion = appVersion;
-                    else
-                        AppVersion = appVersion.PadRight(5, '\0')[..5];
-                }
+                    AppVersion = appVersion.Length == 5 ? appVersion : appVersion.PadRight(5, '\0')[..5];
                 else
-                {
                     AppVersion = "\0\0\0\0\0";
-                }
             }
 
             // Determine system update version
