@@ -7,6 +7,20 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LibIRD", "LibIRD\LibIRD.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IRDKit", "IRDKit\IRDKit.csproj", "{9060E3AF-E4FB-436F-93A1-5C47389CB88E}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A8BB1F9F-FC8E-471C-9647-6FFF91D63BA7}"
+	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Core", "DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj", "{9E71F5CD-887D-4A61-8460-9F7E8F110B46}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Iso9660", "DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj", "{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Streams", "DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj", "{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +35,18 @@ Global
 		{9060E3AF-E4FB-436F-93A1-5C47389CB88E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9060E3AF-E4FB-436F-93A1-5C47389CB88E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9060E3AF-E4FB-436F-93A1-5C47389CB88E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E71F5CD-887D-4A61-8460-9F7E8F110B46}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E71F5CD-887D-4A61-8460-9F7E8F110B46}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E71F5CD-887D-4A61-8460-9F7E8F110B46}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E71F5CD-887D-4A61-8460-9F7E8F110B46}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

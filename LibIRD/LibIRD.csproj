@@ -24,9 +24,9 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="DiscUtils.Core" Version="0.16.13" />
-    <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
-    <PackageReference Include="DiscUtils.Streams" Version="0.16.13" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
   </ItemGroup>
 
