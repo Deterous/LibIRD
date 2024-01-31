@@ -117,7 +117,6 @@ namespace LibIRD
             }
         }
         private byte[] _discKey;
-        // TODO: Link Data1Key and Disc Key
 
         /// <summary>
         /// D1 key
@@ -640,7 +639,7 @@ namespace LibIRD
                 ExtraConfig |= 0x01;
 
                 // Redump-style IRDs use fields from PS3_DISC.SFB
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+                using SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
 
                 // Parse PS3_DISC.SFB file
                 PS3_DiscSFB ps3_DiscSFB = new(s);
@@ -658,7 +657,7 @@ namespace LibIRD
             }
 
             // Read PS3 Metadata from PARAM.SFO
-            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
+            using (SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
@@ -744,7 +743,7 @@ namespace LibIRD
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             // Determine PUP file offset via cluster
-            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
+            Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
             if (updateClusters == null && updateClusters.Length == 0 && updateClusters[0] == null)
                 throw new InvalidFileSystemException("Invalid file extents for PS3UPDAT.PUP");
 
@@ -787,7 +786,7 @@ namespace LibIRD
         private void GetHeader(FileStream fs, CDReader reader)
         {
             // Determine the extent of the header via cluster (Sector 0 to first data sector)
-            DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
+            Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
             if (sfbClusters == null && sfbClusters.Length == 0 && sfbClusters[0] == null)
                 throw new InvalidFileSystemException("Invalid file extents for PS3_DISC.SFB");
             // End of header is at beginning of first byte of dedicated cluster
@@ -929,7 +928,7 @@ namespace LibIRD
                 string filePath = fileInfo.FullName;
 
                 // Determine the extents of the file via clusters
-                DiscUtils.Streams.Range<long, long>[] fileClusters = reader.PathToClusters(filePath);
+                Range<long, long>[] fileClusters = reader.PathToClusters(filePath);
 
                 // If invalid clusters were returned, we can't hash this file
                 if (fileClusters == null && fileClusters.Length == 0)

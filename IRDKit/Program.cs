@@ -487,7 +487,7 @@ namespace IRDKit
                 printText.AppendLine($"TitleID: {IRD1.TitleID} vs {IRD2.TitleID}");
 
             if (IRD1.Title != IRD2.Title)
-                printText.AppendLine($"Title: {IRD1.Title} vs {IRD2.Title}");
+                printText.AppendLine($"Title: \"{IRD1.Title}\" vs \"{IRD2.Title}\"");
 
             if (IRD1.SystemVersion != IRD2.SystemVersion)
                 printText.AppendLine($"PUP Version: {IRD1.SystemVersion} vs {IRD2.SystemVersion}");
@@ -504,8 +504,13 @@ namespace IRDKit
             if (header1.Length != header2.Length)
                 printText.AppendLine($"Header Length: {header1.Length} vs {header2.Length}");
 
-            if (!header1.SequenceEqual(header2))
-                printText.AppendLine($"Header: Differs");
+            int headerDiff;
+            if (header1.Length < header2.Length)
+                headerDiff = header2.Length - header1.Length + header1.Where((x, i) => x != header2[i]).Count();
+            else
+                headerDiff = header1.Length - header2.Length + header2.Where((x, i) => x != header1[i]).Count();
+            if (headerDiff != 0)
+                printText.AppendLine($"Header: Differs by {headerDiff} bytes");
 
             byte[] footer1 = Decompress(IRD1.Footer);
             byte[] footer2 = Decompress(IRD2.Footer);
@@ -513,8 +518,13 @@ namespace IRDKit
             if (footer1.Length != footer2.Length)
                 printText.AppendLine($"Footer Length: {footer1.Length} vs {footer2.Length}");
 
-            if (!footer1.SequenceEqual(footer2))
-                printText.AppendLine($"Footer: Differs");
+            int footerDiff;
+            if (footer1.Length < footer2.Length)
+                footerDiff = footer2.Length - footer1.Length + footer1.Where((x, i) => x != footer2[i]).Count();
+            else
+                footerDiff = footer1.Length - footer2.Length + footer2.Where((x, i) => x != footer1[i]).Count();
+            if (footerDiff != 0)
+                printText.AppendLine($"Footer: Differs by {footerDiff} bytes");
 
             if (IRD1.RegionCount != IRD2.RegionCount)
                 printText.AppendLine($"Region Count: {IRD1.RegionCount} vs {IRD2.RegionCount}");
@@ -533,21 +543,19 @@ namespace IRDKit
             if (IRD1.FileCount != IRD2.FileCount)
                 printText.AppendLine($"File Count: {IRD1.FileCount} vs {IRD2.FileCount}");
 
-            int fileCount = IRD2.FileCount < IRD1.FileCount ? (int)IRD2.FileCount : (int)IRD1.FileCount;
-            if (fileCount > IRD1.FileKeys.Length)
-                fileCount = IRD1.FileKeys.Length;
-            if (fileCount > IRD2.FileKeys.Length)
-                fileCount = IRD2.FileKeys.Length;
-            if (fileCount > IRD1.FileHashes.Length)
-                fileCount = IRD1.FileHashes.Length;
-            if (fileCount > IRD2.FileHashes.Length)
-                fileCount = IRD2.FileHashes.Length;
-            for (int i = 0; i < fileCount; i++)
+            for (int i = 0; i < IRD1.FileKeys.Length; i++)
             {
-                if (IRD1.FileKeys[i] != IRD2.FileKeys[i])
-                    printText.AppendLine($"File {i} Offset: {IRD1.FileKeys[i]} vs {IRD2.FileKeys[i]}");
-                if (!IRD1.FileHashes[i].SequenceEqual(IRD2.FileHashes[i]))
-                    printText.AppendLine($"File {i} Hash: {Convert.ToHexString(IRD1.FileHashes[i])} vs {Convert.ToHexString(IRD2.FileHashes[i])}");
+                int j = Array.FindIndex(IRD2.FileKeys, element => element == IRD1.FileKeys[i]);
+                if (j == -1)
+                    printText.AppendLine($"File Offset: {IRD1.FileKeys[i]} vs [Not Present]");
+                if (j != -1 && !IRD1.FileHashes[i].SequenceEqual(IRD2.FileHashes[j]))
+                    printText.AppendLine($"File Hash at Offset {IRD1.FileKeys[i]}: {Convert.ToHexString(IRD1.FileHashes[i])} vs {Convert.ToHexString(IRD2.FileHashes[j])}");
+            }
+            for (int i = 0; i < IRD2.FileKeys.Length; i++)
+            {
+                int j = Array.FindIndex(IRD1.FileKeys, element => element == IRD2.FileKeys[i]);
+                if (j == -1)
+                    printText.AppendLine($"File Offset: [Not Present] vs {IRD2.FileKeys[i]}");
             }
 
             if (IRD1.ExtraConfig != IRD2.ExtraConfig)
