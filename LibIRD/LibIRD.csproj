@@ -11,12 +11,13 @@
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
-    <Copyright>Copyright (c) Deterous 2023</Copyright>
+    <Copyright>Copyright (c) Deterous 2024</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Deterous/LibIRD/</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>ps3 iso ird redump</PackageTags>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
