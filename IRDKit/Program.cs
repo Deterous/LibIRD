@@ -366,7 +366,7 @@ namespace IRDKit
             // Write PARAM.SFO info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine("PS3_GAME", "PARAM.SFO"), FileMode.Open, FileAccess.Read);
                 ParamSFO paramSFO = new(s);
                 if (json)
                 {
@@ -382,7 +382,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine($"PS3_GAME\\PARAM.SFO not found in {isoPath}\n");
+                    Console.WriteLine($"\\PS3_GAME\\PARAM.SFO not found in {isoPath}\n");
             }
 
             // End JSON object
