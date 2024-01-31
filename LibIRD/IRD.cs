@@ -658,7 +658,7 @@ namespace LibIRD
             }
 
             // Read PS3 Metadata from PARAM.SFO
-            using (DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_GAME", "PARAM.SFO"), FileMode.Open, FileAccess.Read))
+            using (DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
@@ -710,7 +710,7 @@ namespace LibIRD
             // TODO: Speed up program by hashing regions and files at the same time (read from filesystem only once)
 
             // Recursively count all files in ISO to allocate file arrays
-            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo($"{Path.DirectorySeparatorChar}");
+            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
             FileCount = 0;
             CountFiles(rootDir);
             FileKeys = new long[FileCount];
@@ -721,7 +721,12 @@ namespace LibIRD
             FileCount = 0;
             HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
-                throw new InvalidFileSystemException("Unexpected ISO filesystem error: ");
+            {
+                Console.WriteLine($"Likely contains non-contiguous files: detected {FileCount} out of {fileCount} expected files");
+                long[] tempFileKeys = FileKeys;
+                Array.Resize(ref tempFileKeys, (int)FileCount);
+                FileKeys = tempFileKeys;
+            }
             Array.Sort(FileKeys, FileHashes);
         }
 
@@ -739,7 +744,7 @@ namespace LibIRD
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             // Determine PUP file offset via cluster
-            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_UPDATE", "PS3UPDAT.PUP"));
+            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
             if (updateClusters == null && updateClusters.Length == 0 && updateClusters[0] == null)
                 throw new InvalidFileSystemException("Invalid file extents for PS3UPDAT.PUP");
 
@@ -782,7 +787,7 @@ namespace LibIRD
         private void GetHeader(FileStream fs, CDReader reader)
         {
             // Determine the extent of the header via cluster (Sector 0 to first data sector)
-            DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("PS3_DISC.SFB");
+            DiscUtils.Streams.Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
             if (sfbClusters == null && sfbClusters.Length == 0 && sfbClusters[0] == null)
                 throw new InvalidFileSystemException("Invalid file extents for PS3_DISC.SFB");
             // End of header is at beginning of first byte of dedicated cluster
@@ -927,11 +932,26 @@ namespace LibIRD
                 DiscUtils.Streams.Range<long, long>[] fileClusters = reader.PathToClusters(filePath);
 
                 // If invalid clusters were returned, we can't hash this file
-                if (fileClusters == null && fileClusters.Length == 0 && fileClusters[0] == null)
+                if (fileClusters == null && fileClusters.Length == 0)
                     throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
 
-                // Determine file offset
-                int firstSector = (int)(fileClusters[0].Offset); // TODO: Check smallest of all [i] rather than take [0]
+                // Determine smallest file offset as first sector
+                long smallestOffset = fileClusters[0].Offset;
+                for (int i = 1; i < fileClusters.Length; i++)
+                {
+                    if (fileClusters[i] == null)
+                        throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
+
+                    if (fileClusters[i].Offset < smallestOffset)
+                        smallestOffset = fileClusters[i].Offset;
+                }
+                int firstSector = (int)(smallestOffset);
+
+                // If already encountered file offset, skip this file
+                if (Array.Exists(FileKeys, element => element == firstSector))
+                    continue;
+
+                // Add file offset to keys
                 FileKeys[FileCount] = firstSector;
 
                 // Determine whether file is in encrypted or decrypted region

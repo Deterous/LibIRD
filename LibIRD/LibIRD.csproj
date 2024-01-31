@@ -6,7 +6,7 @@
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <LangVersion>latest</LangVersion>
 	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
@@ -20,7 +20,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="./README.md" Pack="true" PackagePath=""/>
+    <None Include="./README.md" Pack="true" PackagePath="" />
   </ItemGroup>
   
   <ItemGroup>

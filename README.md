@@ -8,16 +8,13 @@ IRD files contain a summary of what data is on a PlayStation 3 disc. It can be u
 
 ## How to use IRDKit
 
-IRDKit is a tool that allows direct use of LibIRD functionality from the command line interface. The basic usage is:
-```
-irdkit create game.iso
-```
+IRDKit is a tool that allows direct use of LibIRD functionality from a command line interface. The basic usage is:
+- Printing info about an ISO: `irdkit info game.iso`
+- Printing info about all ISOs and IRDs in a folder: `irdkit info .`
+- Creating an IRD from an ISO: `irdkit create game.iso`
+- Finding differences between two IRDs: `irdkit diff game1.ird game2.ird`
 For detailed usage, read more [here](IRDKit).
 
 ## Using the LibIRD library
 
 LibIRD was originally made for creating reproducible, redump-style IRDs when dumping PS3 discs with [MPF](https://github.com/SabreTools/MPF). If you wish to integrate LibIRD into your own application, read the examples [here](LibIRD).
-
-## Limitations
-
-Currently, LibIRD does not produce correct IRDs for ISOs with non-contiguous files. Therefore, do not consider this library "stable" until v1.0.0 is released.

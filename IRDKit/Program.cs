@@ -382,7 +382,7 @@ namespace IRDKit
             // Write PS3_DISC.SFB info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_DISC.SFB"), FileMode.Open, FileAccess.Read);
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
                 PS3_DiscSFB ps3_DiscSFB = new(s);
                 if (json)
                 {
@@ -419,7 +419,7 @@ namespace IRDKit
             // Write PARAM.SFO info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine("PS3_GAME", "PARAM.SFO"), FileMode.Open, FileAccess.Read);
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
                 ParamSFO paramSFO = new(s);
                 if (json)
                 {
@@ -520,6 +520,10 @@ namespace IRDKit
                 printText.AppendLine($"Region Count: {IRD1.RegionCount} vs {IRD2.RegionCount}");
 
             int regionCount = IRD2.RegionCount < IRD1.RegionCount ? IRD2.RegionCount : IRD1.RegionCount;
+            if (regionCount > IRD1.RegionHashes.Length)
+                regionCount = IRD1.RegionHashes.Length;
+            if (regionCount > IRD2.RegionHashes.Length)
+                regionCount = IRD2.RegionHashes.Length;
             for (int i = 0; i < regionCount; i++)
             {
                 if (!IRD1.RegionHashes[i].SequenceEqual(IRD2.RegionHashes[i]))
@@ -529,7 +533,15 @@ namespace IRDKit
             if (IRD1.FileCount != IRD2.FileCount)
                 printText.AppendLine($"File Count: {IRD1.FileCount} vs {IRD2.FileCount}");
 
-            uint fileCount = IRD2.FileCount < IRD1.FileCount ? IRD2.FileCount : IRD1.FileCount;
+            int fileCount = IRD2.FileCount < IRD1.FileCount ? (int)IRD2.FileCount : (int)IRD1.FileCount;
+            if (fileCount > IRD1.FileKeys.Length)
+                fileCount = IRD1.FileKeys.Length;
+            if (fileCount > IRD2.FileKeys.Length)
+                fileCount = IRD2.FileKeys.Length;
+            if (fileCount > IRD1.FileHashes.Length)
+                fileCount = IRD1.FileHashes.Length;
+            if (fileCount > IRD2.FileHashes.Length)
+                fileCount = IRD2.FileHashes.Length;
             for (int i = 0; i < fileCount; i++)
             {
                 if (IRD1.FileKeys[i] != IRD2.FileKeys[i])
