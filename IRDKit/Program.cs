@@ -6,6 +6,7 @@ using SabreTools.RedumpLib.Web;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.IO.Hashing;
 using System.Linq;
 using System.Security.Cryptography;
@@ -15,6 +16,8 @@ namespace IRDKit
 {
     internal class Program
     {
+        #region Options
+
         /// <summary>
         /// IRD Creation command
         /// </summary>
@@ -62,6 +65,26 @@ namespace IRDKit
             public bool Recurse { get; set; }
         }
 
+       /// <summary>
+       /// IRD diff command
+       /// </summary>
+        [Verb("diff", HelpText = "Compare two IRDs and print their differences")]
+        public class DiffOptions
+        {
+            [Value(0, Required = true, HelpText = "Path to the first IRD to compare against")]
+            public string InPath1 { get; set; }
+
+            [Value(1, Required = true, HelpText = "Path to the second IRD file to compare")]
+            public string InPath2 { get; set; }
+
+            [Option('o', "output", HelpText = "Path to the text or json file to be created (will overwrite)")]
+            public string OutPath { get; set; }
+        }
+
+        #endregion
+
+        #region Program
+
         /// <summary>
         /// Parse command line arguments
         /// </summary>
@@ -72,7 +95,7 @@ namespace IRDKit
             Console.OutputEncoding = Encoding.UTF8;
 
             // Parse arguments
-            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions>(args).WithParsed(Run);
+            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions, DiffOptions>(args).WithParsed(Run);
         }
 
         /// <summary>
@@ -151,12 +174,17 @@ namespace IRDKit
                 // Process options from an `info` command
                 case InfoOptions opt:
 
+                    // Validate required parameter
+                    ArgumentNullException.ThrowIfNull(opt.InPath);
+
                     // Clear the output file path if it exists
                     if (opt.OutPath != null && opt.OutPath != "")
                         File.Delete(opt.OutPath);
 
                     foreach (string filePath in opt.InPath)
                     {
+                        // Validate path
+                        ArgumentNullException.ThrowIfNull(filePath);
 
                         // If directory, search for all ISOs in current directory
                         if (Directory.Exists(filePath))
@@ -248,11 +276,36 @@ namespace IRDKit
 
                     break;
 
+                // Process options from a `diff` command
+                case DiffOptions opt:
+
+                    // Validate required parameter
+                    ArgumentNullException.ThrowIfNull(opt.InPath1);
+                    ArgumentNullException.ThrowIfNull(opt.InPath2);
+                    if (!File.Exists(opt.InPath1)) throw new ArgumentException($"{opt.InPath1} is not a valid file or directory");
+                    if (!File.Exists(opt.InPath2)) throw new ArgumentException($"{opt.InPath2} is not a valid file or directory");
+
+                    // Clear the output file path if it exists
+                    if (opt.OutPath != null && opt.OutPath != "")
+                        File.Delete(opt.OutPath);
+
+                    // Compare the two IRDs
+                    PrintDiff(opt.InPath1, opt.InPath2, opt.OutPath);
+
+                    if (opt.OutPath != null && opt.OutPath != "")
+                        Console.WriteLine($"Diff saved to {opt.OutPath}");
+
+                    break;
+
                 // Unknown command
                 default:
                     break;
             }
         }
+
+        #endregion
+
+        #region Functionality
 
         /// <summary>
         /// Prints info about a file
@@ -329,7 +382,7 @@ namespace IRDKit
             // Write PS3_DISC.SFB info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+                using DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_DISC.SFB"), FileMode.Open, FileAccess.Read);
                 PS3_DiscSFB ps3_DiscSFB = new(s);
                 if (json)
                 {
@@ -403,6 +456,110 @@ namespace IRDKit
                         Console.WriteLine("\n},");
                 }
             }
+        }
+
+        /// <summary>
+        /// Prints the differences between two IRD files
+        /// </summary>
+        /// <param name="irdPath1">First IRD path to compare against</param>
+        /// <param name="irdPath2">Second IRD path to compare against</param>
+        /// <param name="outPath">File to write comparison to, null if print to Console</param>
+        public static void PrintDiff(string irdPath1, string irdPath2, string outPath = null)
+        {
+            // Check they are different IRDs
+            if (Path.GetFullPath(irdPath1) == Path.GetFullPath(irdPath2))
+            {
+                Console.WriteLine("Provide two different IRDs for a diff");
+                return;
+            }
+
+            // Parse each IRD
+            IRD IRD1 = IRD.Read(irdPath1);
+            IRD IRD2 = IRD.Read(irdPath2);
+
+            // Build a formatted diff
+            StringBuilder printText = new();
+
+            if (IRD1.Version != IRD2.Version)
+                printText.AppendLine($"Version: {IRD1.Version} vs {IRD2.Version}");
+
+            if (IRD1.TitleID != IRD2.TitleID)
+                printText.AppendLine($"TitleID: {IRD1.TitleID} vs {IRD2.TitleID}");
+
+            if (IRD1.Title != IRD2.Title)
+                printText.AppendLine($"Title: {IRD1.Title} vs {IRD2.Title}");
+
+            if (IRD1.SystemVersion != IRD2.SystemVersion)
+                printText.AppendLine($"PUP Version: {IRD1.SystemVersion} vs {IRD2.SystemVersion}");
+
+            if (IRD1.DiscVersion != IRD2.DiscVersion)
+                printText.AppendLine($"Disc Version: {IRD1.DiscVersion} vs {IRD2.DiscVersion}");
+
+            if (IRD1.AppVersion != IRD2.AppVersion)
+                printText.AppendLine($"App Version: {IRD1.AppVersion} vs {IRD2.AppVersion}");
+
+            byte[] header1 = Decompress(IRD1.Header);
+            byte[] header2 = Decompress(IRD2.Header);
+
+            if (header1.Length != header2.Length)
+                printText.AppendLine($"Header Length: {header1.Length} vs {header2.Length}");
+
+            if (!header1.SequenceEqual(header2))
+                printText.AppendLine($"Header: Differs");
+
+            byte[] footer1 = Decompress(IRD1.Footer);
+            byte[] footer2 = Decompress(IRD2.Footer);
+
+            if (footer1.Length != footer2.Length)
+                printText.AppendLine($"Footer Length: {footer1.Length} vs {footer2.Length}");
+
+            if (!footer1.SequenceEqual(footer2))
+                printText.AppendLine($"Footer: Differs");
+
+            if (IRD1.RegionCount != IRD2.RegionCount)
+                printText.AppendLine($"Region Count: {IRD1.RegionCount} vs {IRD2.RegionCount}");
+
+            int regionCount = IRD2.RegionCount < IRD1.RegionCount ? IRD2.RegionCount : IRD1.RegionCount;
+            for (int i = 0; i < regionCount; i++)
+            {
+                if (!IRD1.RegionHashes[i].SequenceEqual(IRD2.RegionHashes[i]))
+                    printText.AppendLine($"Region {i} Hash: {Convert.ToHexString(IRD1.RegionHashes[i])} vs {Convert.ToHexString(IRD2.RegionHashes[i])}");
+            }
+
+            if (IRD1.FileCount != IRD2.FileCount)
+                printText.AppendLine($"File Count: {IRD1.FileCount} vs {IRD2.FileCount}");
+
+            uint fileCount = IRD2.FileCount < IRD1.FileCount ? IRD2.FileCount : IRD1.FileCount;
+            for (int i = 0; i < fileCount; i++)
+            {
+                if (IRD1.FileKeys[i] != IRD2.FileKeys[i])
+                    printText.AppendLine($"File {i} Offset: {IRD1.FileKeys[i]} vs {IRD2.FileKeys[i]}");
+                if (!IRD1.FileHashes[i].SequenceEqual(IRD2.FileHashes[i]))
+                    printText.AppendLine($"File {i} Hash: {Convert.ToHexString(IRD1.FileHashes[i])} vs {Convert.ToHexString(IRD2.FileHashes[i])}");
+            }
+
+            if (IRD1.ExtraConfig != IRD2.ExtraConfig)
+                printText.AppendLine($"Extra Config: {IRD1.ExtraConfig:X4} vs {IRD2.ExtraConfig:X4}");
+
+            if (IRD1.Attachments != IRD2.Attachments)
+                printText.AppendLine($"Attachments: {IRD1.Attachments:X4} vs {IRD2.Attachments:X4}");
+
+            if (IRD1.UID != IRD2.UID)
+                printText.AppendLine($"Unique ID: {IRD1.UID:X8} vs {IRD2.UID:X8}");
+
+            if (!IRD1.Data1Key.SequenceEqual(IRD2.Data1Key))
+                printText.AppendLine($"Data 1 Key: {Convert.ToHexString(IRD1.Data1Key)} vs {Convert.ToHexString(IRD2.Data1Key)}");
+
+            if (!IRD1.Data2Key.SequenceEqual(IRD2.Data2Key))
+                printText.AppendLine($"Data 2 Key: {Convert.ToHexString(IRD1.Data2Key)} vs {Convert.ToHexString(IRD2.Data2Key)}");
+
+            if (!IRD1.PIC.SequenceEqual(IRD2.PIC))
+                printText.AppendLine($"PIC: {Convert.ToHexString(IRD1.PIC)} vs {Convert.ToHexString(IRD2.PIC)}");
+
+            if (outPath != null)
+                File.AppendAllText(outPath, printText.ToString());
+            else
+                Console.WriteLine(printText.ToString());
         }
 
         /// <summary>
@@ -615,5 +772,25 @@ namespace IRDKit
             ird.Print();
             return irdPath;
         }
+
+        #endregion
+
+        #region Helper Functions
+
+        /// <summary>
+        /// Decompress a gzipped byte array
+        /// </summary>
+        /// <param name="data">Gzipped byte array</param>
+        /// <returns>Un-gzipped byte array</returns>
+        static byte[] Decompress(byte[] data)
+        {
+            using var compressedStream = new MemoryStream(data);
+            using var zipStream = new GZipStream(compressedStream, CompressionMode.Decompress);
+            using var resultStream = new MemoryStream();
+            zipStream.CopyTo(resultStream);
+            return resultStream.ToArray();
+        }
+
+        #endregion
     }
 }

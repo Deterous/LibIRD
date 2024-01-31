@@ -658,7 +658,7 @@ namespace LibIRD
             }
 
             // Read PS3 Metadata from PARAM.SFO
-            using (DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine("PS3_GAME", "PARAM.SFO"), FileMode.Open, FileAccess.Read))
+            using (DiscUtils.Streams.SparseStream s = reader.OpenFile(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_GAME", "PARAM.SFO"), FileMode.Open, FileAccess.Read))
             {
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
@@ -710,7 +710,7 @@ namespace LibIRD
             // TODO: Speed up program by hashing regions and files at the same time (read from filesystem only once)
 
             // Recursively count all files in ISO to allocate file arrays
-            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("");
+            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo($"{Path.DirectorySeparatorChar}");
             FileCount = 0;
             CountFiles(rootDir);
             FileKeys = new long[FileCount];
@@ -739,7 +739,7 @@ namespace LibIRD
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             // Determine PUP file offset via cluster
-            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters(Path.Combine("PS3_UPDATE", "PS3UPDAT.PUP"));
+            DiscUtils.Streams.Range<long, long>[] updateClusters = reader.PathToClusters(Path.Combine($"{Path.DirectorySeparatorChar}", "PS3_UPDATE", "PS3UPDAT.PUP"));
             if (updateClusters == null && updateClusters.Length == 0 && updateClusters[0] == null)
                 throw new InvalidFileSystemException("Invalid file extents for PS3UPDAT.PUP");
 
