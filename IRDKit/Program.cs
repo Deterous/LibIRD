@@ -480,30 +480,39 @@ namespace IRDKit
             // Build a formatted diff
             StringBuilder printText = new();
 
+            // Print any version difference
             if (IRD1.Version != IRD2.Version)
                 printText.AppendLine($"Version: {IRD1.Version} vs {IRD2.Version}");
 
+            // Print any title ID difference
             if (IRD1.TitleID != IRD2.TitleID)
                 printText.AppendLine($"TitleID: {IRD1.TitleID} vs {IRD2.TitleID}");
 
+            // Print any title difference
             if (IRD1.Title != IRD2.Title)
                 printText.AppendLine($"Title: \"{IRD1.Title}\" vs \"{IRD2.Title}\"");
 
+            // Print any system version difference
             if (IRD1.SystemVersion != IRD2.SystemVersion)
                 printText.AppendLine($"PUP Version: {IRD1.SystemVersion} vs {IRD2.SystemVersion}");
 
+            // Print any disc version difference
             if (IRD1.DiscVersion != IRD2.DiscVersion)
                 printText.AppendLine($"Disc Version: {IRD1.DiscVersion} vs {IRD2.DiscVersion}");
 
+            // Print any app version difference
             if (IRD1.AppVersion != IRD2.AppVersion)
                 printText.AppendLine($"App Version: {IRD1.AppVersion} vs {IRD2.AppVersion}");
 
+            // Un-gzip the headers to compare them
             byte[] header1 = Decompress(IRD1.Header);
             byte[] header2 = Decompress(IRD2.Header);
 
+            // Print the difference in header length, if not 0
             if (header1.Length != header2.Length)
                 printText.AppendLine($"Header Length: {header1.Length} vs {header2.Length}");
 
+            // Print number of bytes that the headers differ by, if not 0
             int headerDiff;
             if (header1.Length < header2.Length)
                 headerDiff = header2.Length - header1.Length + header1.Where((x, i) => x != header2[i]).Count();
@@ -512,12 +521,15 @@ namespace IRDKit
             if (headerDiff != 0)
                 printText.AppendLine($"Header: Differs by {headerDiff} bytes");
 
+            // Un-gzip the footers to compare them
             byte[] footer1 = Decompress(IRD1.Footer);
             byte[] footer2 = Decompress(IRD2.Footer);
 
+            // Print the difference in footer length, if not 0
             if (footer1.Length != footer2.Length)
                 printText.AppendLine($"Footer Length: {footer1.Length} vs {footer2.Length}");
 
+            // Print number of bytes that the footers differ by, if not 0
             int footerDiff;
             if (footer1.Length < footer2.Length)
                 footerDiff = footer2.Length - footer1.Length + footer1.Where((x, i) => x != footer2[i]).Count();
@@ -526,9 +538,11 @@ namespace IRDKit
             if (footerDiff != 0)
                 printText.AppendLine($"Footer: Differs by {footerDiff} bytes");
 
+            // Print the difference in number of regions, if not 0
             if (IRD1.RegionCount != IRD2.RegionCount)
                 printText.AppendLine($"Region Count: {IRD1.RegionCount} vs {IRD2.RegionCount}");
 
+            // Print any differences in region hashes
             int regionCount = IRD2.RegionCount < IRD1.RegionCount ? IRD2.RegionCount : IRD1.RegionCount;
             if (regionCount > IRD1.RegionHashes.Length)
                 regionCount = IRD1.RegionHashes.Length;
@@ -540,14 +554,18 @@ namespace IRDKit
                     printText.AppendLine($"Region {i} Hash: {Convert.ToHexString(IRD1.RegionHashes[i])} vs {Convert.ToHexString(IRD2.RegionHashes[i])}");
             }
 
+            // Print the difference in number of files, if not 0
             if (IRD1.FileCount != IRD2.FileCount)
                 printText.AppendLine($"File Count: {IRD1.FileCount} vs {IRD2.FileCount}");
 
+            // Print the mismatch file hashes, for each file offset at which they differ
+            List<long> missingOffsets1 = [];
+            List<long> missingOffsets2 = [];
             for (int i = 0; i < IRD1.FileKeys.Length; i++)
             {
                 int j = Array.FindIndex(IRD2.FileKeys, element => element == IRD1.FileKeys[i]);
                 if (j == -1)
-                    printText.AppendLine($"File Offset: {IRD1.FileKeys[i]} vs [Not Present]");
+                    missingOffsets2.Add(IRD1.FileKeys[i]);
                 if (j != -1 && !IRD1.FileHashes[i].SequenceEqual(IRD2.FileHashes[j]))
                     printText.AppendLine($"File Hash at Offset {IRD1.FileKeys[i]}: {Convert.ToHexString(IRD1.FileHashes[i])} vs {Convert.ToHexString(IRD2.FileHashes[j])}");
             }
@@ -555,27 +573,37 @@ namespace IRDKit
             {
                 int j = Array.FindIndex(IRD1.FileKeys, element => element == IRD2.FileKeys[i]);
                 if (j == -1)
-                    printText.AppendLine($"File Offset: [Not Present] vs {IRD2.FileKeys[i]}");
+                    missingOffsets1.Add(IRD2.FileKeys[i]);
             }
+            // Print the file offsets that differ
+            printText.AppendLine($"File Offsets not Present in {irdPath1}: {string.Join(", ", missingOffsets1)}");
+            printText.AppendLine($"File Offsets not Present in {irdPath2}: {string.Join(", ", missingOffsets2)}");
 
+            // Print any extra config data difference
             if (IRD1.ExtraConfig != IRD2.ExtraConfig)
                 printText.AppendLine($"Extra Config: {IRD1.ExtraConfig:X4} vs {IRD2.ExtraConfig:X4}");
 
+            // Print any attachments data difference
             if (IRD1.Attachments != IRD2.Attachments)
                 printText.AppendLine($"Attachments: {IRD1.Attachments:X4} vs {IRD2.Attachments:X4}");
 
+            // Print any unique ID difference
             if (IRD1.UID != IRD2.UID)
                 printText.AppendLine($"Unique ID: {IRD1.UID:X8} vs {IRD2.UID:X8}");
 
+            // Print any data 1 key difference
             if (!IRD1.Data1Key.SequenceEqual(IRD2.Data1Key))
                 printText.AppendLine($"Data 1 Key: {Convert.ToHexString(IRD1.Data1Key)} vs {Convert.ToHexString(IRD2.Data1Key)}");
 
+            // Print any data 2 key difference
             if (!IRD1.Data2Key.SequenceEqual(IRD2.Data2Key))
                 printText.AppendLine($"Data 2 Key: {Convert.ToHexString(IRD1.Data2Key)} vs {Convert.ToHexString(IRD2.Data2Key)}");
 
+            // Print any PIC difference
             if (!IRD1.PIC.SequenceEqual(IRD2.PIC))
                 printText.AppendLine($"PIC: {Convert.ToHexString(IRD1.PIC)} vs {Convert.ToHexString(IRD2.PIC)}");
 
+            // Write formatted string to file if output path provided, otherwise to console
             if (outPath != null)
                 File.AppendAllText(outPath, printText.ToString());
             else

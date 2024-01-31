@@ -6,12 +6,12 @@
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <LangVersion>latest</LangVersion>
 	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
-    <Copyright>Copyright (c) Deterous 2024</Copyright>
+    <Copyright>Copyright (c) Deterous 2023-2024</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Deterous/LibIRD/</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
