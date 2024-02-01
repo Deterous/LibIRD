@@ -721,7 +721,7 @@ namespace LibIRD
             HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
             {
-                Console.WriteLine($"{isoPath} contains splits files: detected {FileCount} out of {fileCount} expected files");
+                Console.WriteLine($"{isoPath} contains split files: detected {FileCount} out of {fileCount} expected files");
                 long[] tempFileKeys = FileKeys;
                 Array.Resize(ref tempFileKeys, (int)FileCount);
                 FileKeys = tempFileKeys;

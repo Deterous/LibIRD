@@ -668,7 +668,13 @@ namespace IRDKit
                 return null;
             }
 
+            // Determine IRD path if only folder given
+            if (Directory.Exists(irdPath))
+                irdPath = Path.Combine(irdPath, Path.GetFileName(Path.ChangeExtension(isoPath, ".ird")));
+
             // Determine IRD path if none given
+            if (irdPath == string.Empty)
+                irdPath = Path.GetFileName(Path.ChangeExtension(isoPath, ".ird"));
             irdPath ??= Path.ChangeExtension(isoPath, ".ird");
 
             // Create new reproducible redump-style IRD with a given hex key
