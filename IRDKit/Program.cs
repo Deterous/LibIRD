@@ -44,6 +44,9 @@ namespace IRDKit
 
             [Option('r', "recurse", HelpText = "Recurse through all subdirectories and generate IRDs for all ISOs")]
             public bool Recurse { get; set; }
+
+            [Option('v', "verbose", HelpText = "Print more information during IRD creation")]
+            public bool Verbose { get; set; }
         }
 
         /// <summary>
@@ -111,12 +114,17 @@ namespace IRDKit
                 case CreateOptions opt:
 
                     // Validate ISO paths
-                    ArgumentNullException.ThrowIfNull(opt.ISOPath);
+                    if (opt.ISOPath == null || !opt.ISOPath.Any())
+                    {
+                        Console.Error.WriteLine("Provide a valid ISO path to create an IRD");
+                        return;
+                    }
 
                     foreach (string isoPath in opt.ISOPath)
                     {
                         // Validate ISO path
-                        ArgumentNullException.ThrowIfNull(isoPath);
+                        if (string.IsNullOrEmpty(isoPath))
+                            continue;
 
                         // If directory, search for all ISOs in current directory
                         if (Directory.Exists(isoPath))
@@ -125,44 +133,59 @@ namespace IRDKit
                             IEnumerable<string> isoFiles;
                             if (opt.Recurse)
                             {
-                                if (isoPath == ".")
+                                if (opt.Verbose && isoPath == ".")
                                     Console.WriteLine($"Recursively searching for ISOs in current directory");
-                                else
+                                else if (opt.Verbose)
                                     Console.WriteLine($"Recursively searching for ISOs in {isoPath}");
                                 isoFiles = Directory.EnumerateFiles(isoPath, "*.iso", SearchOption.AllDirectories);
                             }
                             else
                             {
-                                if (isoPath == ".")
+                                if (opt.Verbose && isoPath == ".")
                                     Console.WriteLine($"Searching for ISOs in current directory");
-                                else
+                                else if (opt.Verbose)
                                     Console.WriteLine($"Searching for ISOs in {isoPath}");
                                 isoFiles = Directory.EnumerateFiles(isoPath, "*.iso", SearchOption.TopDirectoryOnly);
                             }
 
                             // Warn if no files are found
                             if (!isoFiles.Any())
-                                Console.WriteLine("No ISOs found (ensure .iso extension)");
+                            {
+                                if (opt.Recurse)
+                                    Console.Error.WriteLine($"No ISOs found in {isoPath} (ensure .iso extension)");
+                                else
+                                    Console.Error.WriteLine($"No ISOs found in {isoPath} (ensure .iso extension, or try use -r)");
+                                continue;
+                            }
+
+                            // Determine output IRD folder
+                            string outputPath = Path.GetDirectoryName(opt.IRDPath);
 
                             // Create an IRD file for all ISO files found
                             foreach (string file in isoFiles)
-                                ISO2IRD(file);
+                                ISO2IRD(file, irdPath: outputPath, verbose: opt.Verbose);
                         }
                         else
                         {
                             // Check that given file exists
-                            if (!File.Exists(isoPath)) throw new ArgumentException("Not a valid file or directory");
-
-                            // Save to given output path, if only 1 IRD is being created
-                            if (opt.ISOPath.Count() == 1 && opt.IRDPath != null && opt.IRDPath != "")
+                            if (!File.Exists(isoPath))
                             {
-                                string irdPath = ISO2IRD(isoPath, opt.IRDPath, opt.Key, opt.KeyFile, opt.GetKeyLog, opt.Layerbreak);
+                                Console.Error.WriteLine($"ISO not found: {isoPath}");
+                                return;
+                            }
+
+                            // Only one ISO is being processed
+                            if (!string.IsNullOrEmpty(opt.IRDPath) && opt.ISOPath.Count() == 1)
+                            {
+                                // Save to given output path and filename, if only 1 IRD is being created
+                                string irdPath = ISO2IRD(isoPath, irdPath: opt.IRDPath, hexKey: opt.Key, keyPath: opt.KeyFile, getKeyLog: opt.GetKeyLog, layerbreak: opt.Layerbreak, verbose: opt.Verbose);
                                 if (irdPath != null)
                                     Console.WriteLine($"IRD saved to {irdPath}");
                             }
                             else
                             {
-                                string irdPath = ISO2IRD(isoPath, null, opt.Key, opt.KeyFile, opt.GetKeyLog, opt.Layerbreak);
+                                // Save to given output path, if more than 1 IRD is being created
+                                string irdPath = ISO2IRD(isoPath, irdPath: Path.GetDirectoryName(opt.IRDPath), verbose: opt.Verbose);
                                 if (irdPath != null)
                                     Console.WriteLine($"IRD saved to {irdPath}");
                             }
@@ -175,7 +198,11 @@ namespace IRDKit
                 case InfoOptions opt:
 
                     // Validate required parameter
-                    ArgumentNullException.ThrowIfNull(opt.InPath);
+                    if (opt.InPath == null || !opt.InPath.Any())
+                    {
+                        Console.Error.WriteLine("Provide a valid ISO or IRD path to print info about");
+                        return;
+                    }
 
                     // Clear the output file path if it exists
                     if (opt.OutPath != null && opt.OutPath != "")
@@ -184,7 +211,8 @@ namespace IRDKit
                     foreach (string filePath in opt.InPath)
                     {
                         // Validate path
-                        ArgumentNullException.ThrowIfNull(filePath);
+                        if (string.IsNullOrEmpty(filePath))
+                            continue;
 
                         // If directory, search for all ISOs in current directory
                         if (Directory.Exists(filePath))
@@ -213,7 +241,10 @@ namespace IRDKit
 
                             // Warn if no files are found
                             if (!isoFiles.Any() && !irdFiles.Any())
-                                Console.WriteLine("No IRDs or ISOs found (ensure .ird and .iso extensions)");
+                            {
+                                Console.Error.WriteLine("No IRDs or ISOs found (ensure .ird and .iso extensions)");
+                                return;
+                            }
 
                             // Open JSON object
                             if (opt.Json)
@@ -245,7 +276,7 @@ namespace IRDKit
                                 {
                                     // Not a valid ISO file despite extension, assume file is an IRD
                                     if (!opt.Json)
-                                        Console.WriteLine($"{file} is not a valid ISO file\n");
+                                        Console.Error.WriteLine($"{file} is not a valid ISO file\n");
                                 }
                             }
 
@@ -264,7 +295,11 @@ namespace IRDKit
                         else
                         {
                             // Check that given file exists
-                            if (!File.Exists(filePath)) throw new ArgumentException($"{filePath} is not a valid file or directory");
+                            if (!File.Exists(filePath))
+                            {
+                                Console.Error.WriteLine($"{filePath} is not a valid file");
+                                continue;
+                            }
 
                             // Print info from given file
                             PrintInfo(filePath, opt.Json, true, opt.OutPath);
@@ -279,11 +314,12 @@ namespace IRDKit
                 // Process options from a `diff` command
                 case DiffOptions opt:
 
-                    // Validate required parameter
-                    ArgumentNullException.ThrowIfNull(opt.InPath1);
-                    ArgumentNullException.ThrowIfNull(opt.InPath2);
-                    if (!File.Exists(opt.InPath1)) throw new ArgumentException($"{opt.InPath1} is not a valid file or directory");
-                    if (!File.Exists(opt.InPath2)) throw new ArgumentException($"{opt.InPath2} is not a valid file or directory");
+                    // Validate required parameters
+                    if (opt.InPath1 == null || opt.InPath2 == null || !File.Exists(opt.InPath1) || !File.Exists(opt.InPath2))
+                    {
+                        Console.Error.WriteLine("Provide two paths to IRDs to compare");
+                        return;
+                    }
 
                     // Clear the output file path if it exists
                     if (opt.OutPath != null && opt.OutPath != "")
@@ -355,9 +391,9 @@ namespace IRDKit
                 if (json)
                     return;
                 if (isISO)
-                    Console.WriteLine($"{inPath} is not a valid ISO file\n");
+                    Console.Error.WriteLine($"{inPath} is not a valid ISO file\n");
                 else
-                    Console.WriteLine($"{inPath} is not a valid IRD file\n");
+                    Console.Error.WriteLine($"{inPath} is not a valid IRD file\n");
             }
         }
 
@@ -372,10 +408,13 @@ namespace IRDKit
         public static void PrintISO(string isoPath, bool json, bool single = true, string outPath = null)
         {
             // Open ISO file for reading
-            using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
+            using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read);
             // Validate ISO file stream
-            if (!CDReader.Detect(fs))
-                throw new InvalidFileSystemException($"{isoPath} is not a valid ISO file");
+            if (fs == null || !CDReader.Detect(fs))
+            {
+                Console.Error.WriteLine($"{isoPath} is not a valid ISO file");
+                return;
+            }
             // Create new ISO reader
             using CDReader reader = new(fs, true, true);
 
@@ -412,7 +451,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine($"{isoPath} is not a valid PS3 ISO file\n");
+                    Console.Error.WriteLine($"{isoPath} is not a valid PS3 ISO file\n");
                 return;
             }
 
@@ -435,7 +474,7 @@ namespace IRDKit
             catch (FileNotFoundException)
             {
                 if (!json)
-                    Console.WriteLine($"\\PS3_GAME\\PARAM.SFO not found in {isoPath}\n");
+                    Console.Error.WriteLine($"\\PS3_GAME\\PARAM.SFO not found in {isoPath}\n");
             }
 
             // End JSON object
@@ -469,7 +508,7 @@ namespace IRDKit
             // Check they are different IRDs
             if (Path.GetFullPath(irdPath1) == Path.GetFullPath(irdPath2))
             {
-                Console.WriteLine("Provide two different IRDs for a diff");
+                Console.Error.WriteLine("Provide two different IRDs for a diff");
                 return;
             }
 
@@ -619,13 +658,13 @@ namespace IRDKit
         /// <param name="keyPath">Disc key file (overridden by hex string if present)</param>
         /// <param name="getKeyLog">GetKey log file (overridden by disc key or key file if present)</param>
         /// <param name="layerbreak">Layerbreak value of disc</param>
-        public static string ISO2IRD(string isoPath, string irdPath = null, string hexKey = null, string keyPath = null, string getKeyLog = null, long? layerbreak = null)
+        public static string ISO2IRD(string isoPath, string irdPath = null, string hexKey = null, string keyPath = null, string getKeyLog = null, long? layerbreak = null, bool verbose = false)
         {
             // Check file exists
             FileInfo iso = new(isoPath);
             if (!iso.Exists)
             {
-                Console.WriteLine($"{nameof(isoPath)} is not a valid file or directory");
+                Console.Error.WriteLine($"{nameof(isoPath)} is not a valid file or directory");
                 return null;
             }
 
@@ -645,7 +684,8 @@ namespace IRDKit
                     Console.WriteLine($"Creating {irdPath} with Key: {hexKey}");
                     IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                     ird1.Write(irdPath);
-                    ird1.Print();
+                    if (verbose)
+                        ird1.Print();
                     return irdPath;
                 }
                 catch (ArgumentException)
@@ -669,7 +709,8 @@ namespace IRDKit
                     IRD ird2 = new ReIRD(isoPath, discKey, layerbreak);
                     Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
                     ird2.Write(irdPath);
-                    ird2.Print();
+                    if (verbose)
+                        ird2.Print();
                     return irdPath;
                 }
                 catch (ArgumentException)
@@ -691,7 +732,8 @@ namespace IRDKit
                     Console.WriteLine($"Creating {irdPath} with key from: {getKeyLog}");
                     IRD ird3 = new ReIRD(isoPath, getKeyLog);
                     ird3.Write(irdPath);
-                    ird3.Print();
+                    if (verbose)
+                        ird3.Print();
                     return irdPath;
                 }
                 catch (FileNotFoundException)
@@ -717,7 +759,8 @@ namespace IRDKit
                     Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
                     IRD ird2 = new ReIRD(isoPath, discKey, layerbreak);
                     ird2.Write(irdPath);
-                    ird2.Print();
+                    if (verbose)
+                        ird2.Print();
                     return irdPath;
                 }
                 catch (ArgumentException)
@@ -742,7 +785,8 @@ namespace IRDKit
                     Console.WriteLine($"Creating {irdPath} with key from: {logfilePath}");
                     IRD ird3 = new ReIRD(isoPath, logfilePath);
                     ird3.Write(irdPath);
-                    ird3.Print();
+                    if (verbose)
+                        ird3.Print();
                     return irdPath;
                 }
                 catch (FileNotFoundException)
@@ -753,7 +797,8 @@ namespace IRDKit
             }
 
             // No key provided, try get key from redump.org
-            Console.WriteLine("No key provided... Searching for key on redump.org");
+            if (verbose)
+                Console.WriteLine("No key provided... Searching for key on redump.org");
 
             // Compute CRC32 hash
             byte[] crc32;
@@ -773,12 +818,12 @@ namespace IRDKit
             int id;
             if (ids.Count == 0)
             {
-                Console.WriteLine("ISO not found in redump, cannot automatically retreive key");
+                Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
                 return null;
             }
             else if (ids.Count > 1)
             {
-                // Compute SHA1 hash
+                // More than one result for the CRC32 hash, compute SHA1 hash instead
                 byte[] sha1;
                 using (FileStream fs = File.OpenRead(isoPath))
                 {
@@ -791,18 +836,19 @@ namespace IRDKit
                 List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1_hash).ConfigureAwait(false).GetAwaiter().GetResult();
                 if (ids2.Count == 0)
                 {
-                    Console.WriteLine("ISO not found in redump, cannot automatically retreive key");
+                    Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
                     return null;
                 }
                 else if (ids2.Count > 1)
                 {
-                    Console.WriteLine("Cannot automatically get key from redump. Please search redump.org and run again with -k");
+                    Console.Error.WriteLine("Cannot automatically get key from redump. Please search redump.org and run again with -k");
                     return null;
                 }
                 id = ids2[0];
             }
             else
             {
+                // One result found, assume it is the PS3 ISO
                 id = ids[0];
             }
 
@@ -810,14 +856,16 @@ namespace IRDKit
             byte[] key = redump.GetByteArrayAsync($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
             if (key.Length != 16)
             {
-                Console.WriteLine("Invalid key obtained from redump");
+                Console.Error.WriteLine("Invalid key obtained from redump and no valid key provided, cannot create IRD");
+                return null;
             }
 
             // Create IRD with key from redump
-            Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(key)}");
+            Console.WriteLine($"Creating {irdPath} with Key from redump.org: {Convert.ToHexString(key)}");
             IRD ird = new ReIRD(isoPath, key, layerbreak);
             ird.Write(irdPath);
-            ird.Print();
+            if (verbose)
+                ird.Print();
             return irdPath;
         }
 

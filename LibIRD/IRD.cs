@@ -721,7 +721,7 @@ namespace LibIRD
             HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
             {
-                Console.WriteLine($"Likely contains non-contiguous files: detected {FileCount} out of {fileCount} expected files");
+                Console.WriteLine($"{isoPath} contains splits files: detected {FileCount} out of {fileCount} expected files");
                 long[] tempFileKeys = FileKeys;
                 Array.Resize(ref tempFileKeys, (int)FileCount);
                 FileKeys = tempFileKeys;
@@ -949,6 +949,9 @@ namespace LibIRD
                 // If already encountered file offset, skip this file
                 if (Array.Exists(FileKeys, element => element == firstSector))
                     continue;
+
+                if (fileClusters.Length > 1)
+                    Console.WriteLine($"Split file detected: {filePath}");
 
                 // Add file offset to keys
                 FileKeys[FileCount] = firstSector;
