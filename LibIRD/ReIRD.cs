@@ -1,6 +1,8 @@
-﻿using System;
+﻿using DiscUtils.Iso9660;
+using System;
 using System.IO;
 using System.IO.Hashing;
+using System.Security;
 
 namespace LibIRD
 {
@@ -51,15 +53,6 @@ namespace LibIRD
     /// </summary>
     public class ReIRD : IRD
     {
-        #region Properties
-
-        /// <summary>
-        /// ISO file size
-        /// </summary>
-        private long Size { get; set; }
-
-        #endregion
-
         #region Constructors
 
         /// <summary>
@@ -67,25 +60,11 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="getKeyLog">Path to the GetKey log file</param>
-        /// <param name="layerbreak">Layerbreak value, in sectors</param>
         /// <exception cref="InvalidDataException"></exception>
-        public ReIRD(string isoPath, string getKeyLog, long? layerbreak = null) : base(isoPath, getKeyLog, true)
+        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true)
         {
             // Generate Unique Identifier using ISO CRC32
             UID = GenerateUID(isoPath);
-
-            // Determine ISO file size
-            Size = CalculateSize(isoPath);
-
-            // Generate Data 2 using Disc ID
-            DiscID = GenerateID(Size);
-
-            // Generate Disc PIC
-            byte[] pic = GeneratePIC(Size, layerbreak * SectorSize);
-
-            // Check that GetKey log matches expected PIC
-            if (!((ReadOnlySpan<byte>)PIC).SequenceEqual(pic))
-                throw new InvalidDataException("Unexpected PIC in .getkey.log");
         }
 
         /// <summary>
@@ -101,16 +80,16 @@ namespace LibIRD
             UID = GenerateUID(isoPath);
 
             // Determine ISO file size
-            Size = CalculateSize(isoPath);
+            long size = CalculateSize(isoPath);
 
             // Set Disc Key
             DiscKey = key;
 
             // Generate Data 2 using Disc ID
-            DiscID = GenerateID(Size, region);
+            DiscID = GenerateID(size, region);
 
             // Generate Disc PIC
-            PIC = GeneratePIC(Size, layerbreak * SectorSize);
+            PIC = GeneratePIC(isoPath, size, layerbreak * SectorSize);
 
             // Generate IRD fields
             GenerateIRD(isoPath, true);
@@ -143,12 +122,13 @@ namespace LibIRD
         /// <param name="layerbreak">Layer break value, byte at which disc layers are split across</param>
         /// <param name="exactIRD">True to generate a PIC in 3k3y style (0x03 at 115th byte for BD-50 discs)</param>
         /// <exception cref="ArgumentException"></exception>
-        private static byte[] GeneratePIC(long size, long? layerbreak = null, bool exactIRD = false)
+        private static byte[] GeneratePIC(string isoPath, long size, long? layerbreak = null, bool exactIRD = false)
         {
             // Validate size
             if (size <= 0 || (size % SectorSize) != 0)
                 throw new ArgumentException("ISO Size in bytes must be a positive integer multiple of 2048", nameof(size));
-            // Validate layerbreak
+
+            // Validate provided layerbreak
             if (layerbreak != null)
             {
                 if (layerbreak <= 0 || (layerbreak >= size))
@@ -156,8 +136,16 @@ namespace LibIRD
                 if (layerbreak >= 2 * BDLayerSize || layerbreak % SectorSize != 0)
                     throw new ArgumentException("Unexpected layerbreak value", nameof(size));
             }
-            // If layerbreak value was not set, assume it is a non-hybrid disc with default layerbreak
-            long layer_break = layerbreak ?? BDLayerSize;
+            else
+            {
+                // If no layerbreak provided, ensure ISO is not BD-Video hybrid
+                using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
+                CDReader reader = new(fs, true, true);
+                if (reader.DirectoryExists("\\BDMV"))
+                    throw new ArgumentException("Layerbreak must be provided for BD-Video hybrid discs");
+                // Assume disc has default layerbreak
+                layerbreak = BDLayerSize;
+            }
 
             // Generate the PIC based on the size and layerbreak of the ISO
             byte[] pic;
@@ -167,7 +155,7 @@ namespace LibIRD
              	long l0_start_sector = 1048576;
 			
 			    // Layer 0 end sector = start sector + layerbreak - 2
-			    long l0_end_sector = (layer_break / SectorSize) + l0_start_sector - 2;
+			    long l0_end_sector = ((long)layerbreak / SectorSize) + l0_start_sector - 2;
 			    // Convert end sector location to hex values for PIC
 			    byte[] l0es = [(byte)((l0_end_sector >> 24) & 0xFF),
 						       (byte)((l0_end_sector >> 16) & 0xFF),
@@ -175,7 +163,7 @@ namespace LibIRD
 						       (byte)((l0_end_sector >> 0) & 0xFF)];
 
                 // Layer 1 start sector = end of disc (0x01EFFFFE) - layerbreak + 2
-                long l1_start_sector = 32505854 - (layer_break / SectorSize) + 2;
+                long l1_start_sector = 32505854 - ((long)layerbreak! / SectorSize) + 2;
 			    // Convert start of start sector location to hex values for PIC
 			    byte[] l1ss = [(byte)((l1_start_sector >> 24) & 0xFF),
 						       (byte)((l1_start_sector >> 16) & 0xFF),
@@ -257,11 +245,16 @@ namespace LibIRD
         /// <exception cref="FileNotFoundException"></exception>
         private static uint GenerateUID(string isoPath)
         {
-            // Validate ISO path
-            ArgumentNullException.ThrowIfNull(isoPath, nameof(isoPath));
-
             // Check file exists
-            var iso = new FileInfo(isoPath);
+            FileInfo iso;
+            try
+            {
+                iso = new FileInfo(isoPath);
+            }
+            catch (Exception e)
+            {
+                throw new ArgumentException("Invalid ISO Path: " + e.Message);
+            }
             if (!iso.Exists)
                 throw new FileNotFoundException(nameof(isoPath));
 
@@ -286,11 +279,16 @@ namespace LibIRD
         /// <exception cref="FileNotFoundException"></exception>
         private static long CalculateSize(string isoPath)
         {
-            // Validate ISO path
-            ArgumentNullException.ThrowIfNull(isoPath, nameof(isoPath));
-
             // Check file exists
-            var iso = new FileInfo(isoPath);
+            FileInfo iso;
+            try
+            {
+                iso = new FileInfo(isoPath);
+            }
+            catch (Exception e)
+            {
+                throw new ArgumentException("Invalid ISO Path: " + e.Message);
+            }
             if (!iso.Exists)
                 throw new FileNotFoundException(nameof(isoPath));
 

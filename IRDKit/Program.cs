@@ -174,21 +174,16 @@ namespace IRDKit
                                 return;
                             }
 
-                            // Only one ISO is being processed
-                            if (!string.IsNullOrEmpty(opt.IRDPath) && opt.ISOPath.Count() == 1)
-                            {
-                                // Save to given output path and filename, if only 1 IRD is being created
-                                string irdPath = ISO2IRD(isoPath, irdPath: opt.IRDPath, hexKey: opt.Key, keyPath: opt.KeyFile, getKeyLog: opt.GetKeyLog, layerbreak: opt.Layerbreak, verbose: opt.Verbose);
-                                if (irdPath != null)
-                                    Console.WriteLine($"IRD saved to {irdPath}");
-                            }
+                            string irdPath;
+                            // Save to given output path and filename, if only 1 IRD is being created
+                            if (opt.ISOPath.Count() == 1)
+                                irdPath = ISO2IRD(isoPath, irdPath: opt.IRDPath, hexKey: opt.Key, keyPath: opt.KeyFile, getKeyLog: opt.GetKeyLog, layerbreak: opt.Layerbreak, verbose: opt.Verbose);
+                            // Save to given output path, if more than 1 IRD is being created
                             else
-                            {
-                                // Save to given output path, if more than 1 IRD is being created
-                                string irdPath = ISO2IRD(isoPath, irdPath: Path.GetDirectoryName(opt.IRDPath), verbose: opt.Verbose);
-                                if (irdPath != null)
-                                    Console.WriteLine($"IRD saved to {irdPath}");
-                            }
+                                irdPath = ISO2IRD(isoPath, irdPath: Path.GetDirectoryName(opt.IRDPath), verbose: opt.Verbose);
+
+                            if (irdPath != null)
+                                Console.WriteLine($"IRD saved to {irdPath}");
                         }
                     }
 
@@ -661,7 +656,16 @@ namespace IRDKit
         public static string ISO2IRD(string isoPath, string irdPath = null, string hexKey = null, string keyPath = null, string getKeyLog = null, long? layerbreak = null, bool verbose = false)
         {
             // Check file exists
-            FileInfo iso = new(isoPath);
+            FileInfo iso;
+            try
+            {
+                iso = new(isoPath);
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                return null;
+            }
             if (!iso.Exists)
             {
                 Console.Error.WriteLine($"{nameof(isoPath)} is not a valid file or directory");
@@ -685,18 +689,21 @@ namespace IRDKit
                     // Get disc key from hex string
                     byte[] discKey = Convert.FromHexString(hexKey);
                     if (discKey == null || discKey.Length != 16)
-                        throw new ArgumentException(hexKey);
-
-                    Console.WriteLine($"Creating {irdPath} with Key: {hexKey}");
-                    IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
-                    ird1.Write(irdPath);
-                    if (verbose)
-                        ird1.Print();
-                    return irdPath;
+                        Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                    else
+                    {
+                        Console.WriteLine($"Creating {irdPath} with Key: {hexKey}");
+                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
+                        ird1.Write(irdPath);
+                        if (verbose)
+                            ird1.Print();
+                        return irdPath;
+                    }
                 }
-                catch (ArgumentException)
+                catch (ArgumentException e)
                 {
-                    Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                    Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                    return null;
                 }
                 catch (FileNotFoundException)
                 {
@@ -708,20 +715,26 @@ namespace IRDKit
             // Create new reproducible redump-style IRD with a given key file
             if (keyPath != null)
             {
-                // Read key from .key file
-                byte[] discKey = File.ReadAllBytes(keyPath);
                 try
                 {
-                    IRD ird2 = new ReIRD(isoPath, discKey, layerbreak);
-                    Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
-                    ird2.Write(irdPath);
-                    if (verbose)
-                        ird2.Print();
-                    return irdPath;
+                    // Read key from .key file
+                    byte[] discKey = File.ReadAllBytes(keyPath);
+                    if (discKey == null || discKey.Length != 16)
+                        Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                    else
+                    {
+                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
+                        Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        ird1.Write(irdPath);
+                        if (verbose)
+                            ird1.Print();
+                        return irdPath;
+                    }
                 }
-                catch (ArgumentException)
+                catch (ArgumentException e)
                 {
-                    Console.Error.WriteLine($"{Convert.ToHexString(discKey)} is not a valid key, detecting key automatically...");
+                    Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                    return null;
                 }
                 catch (FileNotFoundException)
                 {
@@ -736,11 +749,16 @@ namespace IRDKit
                 try
                 {
                     Console.WriteLine($"Creating {irdPath} with key from: {getKeyLog}");
-                    IRD ird3 = new ReIRD(isoPath, getKeyLog);
-                    ird3.Write(irdPath);
+                    IRD ird1 = new ReIRD(isoPath, getKeyLog);
+                    ird1.Write(irdPath);
                     if (verbose)
-                        ird3.Print();
+                        ird1.Print();
                     return irdPath;
+                }
+                catch (ArgumentException e)
+                {
+                    Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                    return null;
                 }
                 catch (FileNotFoundException)
                 {
@@ -758,20 +776,23 @@ namespace IRDKit
                 try
                 {
                     // Read key from .key file
-                    byte[] discKey = File.ReadAllBytes(keyfilePath);
+                    byte[] discKey = File.ReadAllBytes(keyPath);
                     if (discKey == null || discKey.Length != 16)
-                        throw new ArgumentException(keyfilePath);
-
-                    Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
-                    IRD ird2 = new ReIRD(isoPath, discKey, layerbreak);
-                    ird2.Write(irdPath);
-                    if (verbose)
-                        ird2.Print();
-                    return irdPath;
+                        Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                    else
+                    {
+                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
+                        Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        ird1.Write(irdPath);
+                        if (verbose)
+                            ird1.Print();
+                        return irdPath;
+                    }
                 }
-                catch (ArgumentException)
+                catch (ArgumentException e)
                 {
-                    Console.Error.WriteLine("Given key file not valid, detecting key automatically...");
+                    Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                    return null;
                 }
                 catch (FileNotFoundException)
                 {
@@ -788,12 +809,17 @@ namespace IRDKit
                 // Found .getkey.log file, check it is valid
                 try
                 {
-                    Console.WriteLine($"Creating {irdPath} with key from: {logfilePath}");
-                    IRD ird3 = new ReIRD(isoPath, logfilePath);
-                    ird3.Write(irdPath);
+                    Console.WriteLine($"Creating {irdPath} with key from: {getKeyLog}");
+                    IRD ird1 = new ReIRD(isoPath, getKeyLog);
+                    ird1.Write(irdPath);
                     if (verbose)
-                        ird3.Print();
+                        ird1.Print();
                     return irdPath;
+                }
+                catch (ArgumentException e)
+                {
+                    Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                    return null;
                 }
                 catch (FileNotFoundException)
                 {
@@ -868,11 +894,24 @@ namespace IRDKit
 
             // Create IRD with key from redump
             Console.WriteLine($"Creating {irdPath} with Key from redump.org: {Convert.ToHexString(key)}");
-            IRD ird = new ReIRD(isoPath, key, layerbreak);
-            ird.Write(irdPath);
-            if (verbose)
-                ird.Print();
-            return irdPath;
+            try
+            {
+                IRD ird = new ReIRD(isoPath, key, layerbreak);
+                ird.Write(irdPath);
+                if (verbose)
+                    ird.Print();
+                return irdPath;
+            }
+            catch (ArgumentException e)
+            {
+                Console.Error.WriteLine(e.Message + ", failed to create IRD");
+                return null;
+            }
+            catch (FileNotFoundException)
+            {
+                Console.Error.WriteLine("File not found, failed to create IRD");
+                return null;
+            }
         }
 
         #endregion

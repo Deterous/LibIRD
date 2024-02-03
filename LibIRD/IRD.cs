@@ -539,7 +539,6 @@ namespace LibIRD
         /// <exception cref="InvalidDataException"></exception>
         private protected void ParseGetKeyLog(string getKeyLog)
         {
-
             // Validate .getkey.log file path
             ArgumentNullException.ThrowIfNull(getKeyLog, nameof(getKeyLog));
             if (!File.Exists(getKeyLog))
