@@ -405,7 +405,6 @@ namespace LibIRD
         private protected static byte[] GenerateD1(byte[] key)
         {
             // Validate key
-            ArgumentNullException.ThrowIfNull(key, nameof(key));
             if (key.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
@@ -439,7 +438,6 @@ namespace LibIRD
         private protected static byte[] GenerateDiscKey(byte[] d1)
         {
             // Validate key
-            ArgumentNullException.ThrowIfNull(d1, nameof(d1));
             if (d1.Length != 16)
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(d1));
 
@@ -473,7 +471,6 @@ namespace LibIRD
         private protected static byte[] GenerateD2(byte[] d2)
         {
             // Validate id
-            ArgumentNullException.ThrowIfNull(d2, nameof(d2));
             if (d2.Length != 16) throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
@@ -506,7 +503,6 @@ namespace LibIRD
         private protected static byte[] GenerateDiscID(byte[] d2)
         {
             // Validate id
-            ArgumentNullException.ThrowIfNull(d2 , nameof(d2));
             if (d2.Length != 16)
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
@@ -540,7 +536,6 @@ namespace LibIRD
         private protected void ParseGetKeyLog(string getKeyLog)
         {
             // Validate .getkey.log file path
-            ArgumentNullException.ThrowIfNull(getKeyLog, nameof(getKeyLog));
             if (!File.Exists(getKeyLog))
                 throw new FileNotFoundException(nameof(getKeyLog));
 
@@ -793,7 +788,11 @@ namespace LibIRD
 
             // Begin a GZip stream to write header to
             using MemoryStream headerStream = new();
+#if NET6_0_OR_GREATER
             using (GZipStream gzs = new(headerStream, CompressionLevel.SmallestSize))
+#else
+            using (GZipStream gzs = new(headerStream, CompressionLevel.Optimal))
+#endif
             {
                 // Start reading data from the beginning of the ISO file
                 fs.Seek(0, SeekOrigin.Begin);
@@ -821,7 +820,11 @@ namespace LibIRD
         {
             // Begin a GZip stream to write footer to
             using MemoryStream footerStream = new();
+#if NET6_0_OR_GREATER
             using (GZipStream gzs = new(footerStream, CompressionLevel.SmallestSize))
+#else
+            using (GZipStream gzs = new(footerStream, CompressionLevel.Optimal))
+#endif
             {
                 // Start reading data from after last file (PS3UPDAT.PUP)
                 fs.Seek(UpdateEnd, SeekOrigin.Begin);
@@ -1061,7 +1064,7 @@ namespace LibIRD
                 CountFiles(dirInfo);
         }
 
-        #endregion
+#endregion
 
         #region IRD File
 
@@ -1176,7 +1179,11 @@ namespace LibIRD
             // Create the IRD file stream
             using FileStream fs = new(irdPath, FileMode.Create, FileAccess.Write);
             // Create a GZipped IRD file stream
+#if NET6_0_OR_GREATER
             using GZipStream gzStream = new(fs, CompressionLevel.SmallestSize);
+#else
+            using GZipStream gzStream = new(fs, CompressionLevel.Optimal);
+#endif
             // Write entire gzipped IRD stream to file
             stream.Position = 0;
             stream.CopyTo(gzStream);

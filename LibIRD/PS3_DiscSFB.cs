@@ -33,12 +33,8 @@ namespace LibIRD
         /// Constructor using a PARAM.SFO file path
         /// </summary>
         /// <param name="sfbPath">Full file path to the PS3_DISC.SFB file</param>
-        /// <exception cref="ArgumentNullException"></exception>
         public PS3_DiscSFB(string sfbPath)
         {
-            // Validate file path
-            ArgumentNullException.ThrowIfNull(sfbPath, nameof(sfbPath));
-
             // Read file as a stream, and parse file
             using FileStream fs = new(sfbPath, FileMode.Open, FileAccess.Read);
             Parse(fs);
