@@ -1064,7 +1064,7 @@ namespace LibIRD
                 CountFiles(dirInfo);
         }
 
-#endregion
+        #endregion
 
         #region IRD File
 
@@ -1250,7 +1250,7 @@ namespace LibIRD
             uint fileCount = br.ReadUInt32();
             long[] fileKeys = new long[fileCount];
             byte[][] fileHashes = new byte[fileCount][];
-            for (int i = 0; i  < fileCount; i++)
+            for (int i = 0; i < fileCount; i++)
             {
                 fileKeys[i] = br.ReadInt64();
                 fileHashes[i] = br.ReadBytes(16);

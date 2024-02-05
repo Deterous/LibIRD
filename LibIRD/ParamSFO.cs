@@ -103,7 +103,7 @@ namespace LibIRD
                               - keyOffset[i];
 
                 // Read ith key name
-                string key = Encoding.ASCII.GetString(br.ReadBytes((int) keyLen)).TrimEnd('\0');
+                string key = Encoding.ASCII.GetString(br.ReadBytes((int)keyLen)).TrimEnd('\0');
 
                 // Move stream to ith data
                 sfoStream.Position = dataTableStart + dataOffset[i];
@@ -112,13 +112,13 @@ namespace LibIRD
                 Field[key] = dataFormat[i] switch
                 {
                     // Non-null-terminated UTF-8 String
-                    0x0004 => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])),
+                    0x0004 => Encoding.UTF8.GetString(br.ReadBytes((int)dataLength[i])),
                     // Null-terminated UTF-8 String
-                    0x0204 => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])).TrimEnd('\0'),
+                    0x0204 => Encoding.UTF8.GetString(br.ReadBytes((int)dataLength[i])).TrimEnd('\0'),
                     // Integer
                     0x0404 => br.ReadInt32().ToString(),
                     // Unknown data format, assume null-terminated string
-                    _ => Encoding.UTF8.GetString(br.ReadBytes((int) dataLength[i])).TrimEnd('\0'),
+                    _ => Encoding.UTF8.GetString(br.ReadBytes((int)dataLength[i])).TrimEnd('\0'),
                 };
             }
         }
@@ -160,13 +160,18 @@ namespace LibIRD
         }
 
         /// <summary>
+        /// Define JSON options once
+        /// </summary>
+        private readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+
+        /// <summary>
         /// Prints parameters extracted from PARAM.SFO to a json object
         /// </summary>
         /// <param name="jsonPath">Optionally print to json file</param>
         public void PrintJson(string jsonPath = null)
         {
             // Serialise PS3_Disc.SFB data to a JSON object
-            string json = JsonSerializer.Serialize(Field, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(Field, JsonOpts);
 
             // If no path given, output to console
             if (jsonPath == null)

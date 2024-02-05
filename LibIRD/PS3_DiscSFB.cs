@@ -27,7 +27,7 @@ namespace LibIRD
         /// A field within the PS3_DISC.SFB file
         /// </summary>
         /// <remarks>string Key, string Value</remarks>
-        public Dictionary<string, string> Field {  get; private set; }
+        public Dictionary<string, string> Field { get; private set; }
 
         /// <summary>
         /// Constructor using a PARAM.SFO file path
@@ -132,13 +132,18 @@ namespace LibIRD
         }
 
         /// <summary>
+        /// Define JSON options once
+        /// </summary>
+        private readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+
+        /// <summary>
         /// Prints parameters extracted from PS3_DISC.SFB to a json object
         /// </summary>
         /// <param name="jsonPath">Optionally print to json file</param>
         public void PrintJson(string jsonPath = null)
         {
             // Serialise PS3_Disc.SFB data to a JSON object
-            string json = JsonSerializer.Serialize(Field, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(Field, JsonOpts);
 
             // If no path given, output to console
             if (jsonPath == null)

@@ -2,7 +2,6 @@
 using System;
 using System.IO;
 using System.IO.Hashing;
-using System.Security;
 
 namespace LibIRD
 {
@@ -152,62 +151,62 @@ namespace LibIRD
             if (size > BDLayerSize) // if BD-50
             {
                 // Layer 0 start sector = 0x01000000
-             	long l0_start_sector = 1048576;
-			
-			    // Layer 0 end sector = start sector + layerbreak - 2
-			    long l0_end_sector = ((long)layerbreak / SectorSize) + l0_start_sector - 2;
-			    // Convert end sector location to hex values for PIC
-			    byte[] l0es = [(byte)((l0_end_sector >> 24) & 0xFF),
-						       (byte)((l0_end_sector >> 16) & 0xFF),
-						       (byte)((l0_end_sector >> 8) & 0xFF),
-						       (byte)((l0_end_sector >> 0) & 0xFF)];
+                long l0_start_sector = 1048576;
+
+                // Layer 0 end sector = start sector + layerbreak - 2
+                long l0_end_sector = ((long)layerbreak / SectorSize) + l0_start_sector - 2;
+                // Convert end sector location to hex values for PIC
+                byte[] l0es = [(byte)((l0_end_sector >> 24) & 0xFF),
+                    (byte)((l0_end_sector >> 16) & 0xFF),
+                    (byte)((l0_end_sector >> 8) & 0xFF),
+                    (byte)((l0_end_sector >> 0) & 0xFF)];
 
                 // Layer 1 start sector = end of disc (0x01EFFFFE) - layerbreak + 2
                 long l1_start_sector = 32505854 - ((long)layerbreak! / SectorSize) + 2;
-			    // Convert start of start sector location to hex values for PIC
-			    byte[] l1ss = [(byte)((l1_start_sector >> 24) & 0xFF),
-						       (byte)((l1_start_sector >> 16) & 0xFF),
-						       (byte)((l1_start_sector >> 8) & 0xFF),
-						       (byte)((l1_start_sector >> 0) & 0xFF)];
-			
-			    // Total sectors used = num_sectors + Layer 0 start + sectors_between_layers (usually 0x01358C00 - 0x00CA73FE - 3)
-			    long total_sectors = (size / SectorSize) + l0_start_sector + (l1_start_sector - l0_end_sector - 3);
-			    byte[] ts = BitConverter.GetBytes((uint) total_sectors);
+                // Convert start of start sector location to hex values for PIC
+                byte[] l1ss = [(byte)((l1_start_sector >> 24) & 0xFF),
+                    (byte)((l1_start_sector >> 16) & 0xFF),
+                    (byte)((l1_start_sector >> 8) & 0xFF),
+                    (byte)((l1_start_sector >> 0) & 0xFF)];
 
-			    // Define the PIC
-			    pic = [
-				    // Initial portion of PIC (24 bytes)
-				    // [4098 bytes] [2x 0x00] ["DI"]   [v1] [10units] [DI num]
+                // Total sectors used = num_sectors + Layer 0 start + sectors_between_layers (usually 0x01358C00 - 0x00CA73FE - 3)
+                long total_sectors = (size / SectorSize) + l0_start_sector + (l1_start_sector - l0_end_sector - 3);
+                byte[] ts = BitConverter.GetBytes((uint)total_sectors);
+
+                // Define the PIC
+                pic = [
+                    // Initial portion of PIC (24 bytes)
+                    // [4098 bytes] [2x 0x00] ["DI"]   [v1] [10units] [DI num]
 				    0x10, 0x02, 0x00, 0x00, 0x44, 0x49, 0x01, 0x10, 0x00, 0x00, 0x20, 0x00,
-				    //   ["BDR"]         [2 layers]
+                    //   ["BDR"]         [2 layers]
 				    0x42, 0x44, 0x4F, 0x01, 0x21, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-				    // Total sectors used on disc (4 bytes)
+                    // Total sectors used on disc (4 bytes)
 				    ts[3], ts[2], ts[1], ts[0],
-				    // 1st Layer sector start location (4 bytes)
+                    // 1st Layer sector start location (4 bytes)
 				    0x00, 0x10, 0x00, 0x00,
-				    // 1st Layer sector end location (4 bytes), 0x00CA73FE for default BD layerbreak of 12219392
+                    // 1st Layer sector end location (4 bytes), 0x00CA73FE for default BD layerbreak of 12219392
 				    l0es[0], l0es[1], l0es[2], l0es[3],
-				    // 32 bytes of zeros
+                    // 32 bytes of zeros
 				    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				    // Initial portion of PIC again, for 2nd layer
-				    // ["DI"]  [v1] [11unit][DI num]
+                    // Initial portion of PIC again, for 2nd layer
+                    // ["DI"]  [v1] [11unit][DI num]
 				    0x44, 0x49, 0x01, 0x11, 0x00, 0x01, 0x20, 0x00,
-				    //   ["BDR"]           [2 layers]
+                    //   ["BDR"]           [2 layers]
 				    0x42, 0x44, 0x4F, 0x01, 0x21, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-				    // Total sectors used on disc
+                    // Total sectors used on disc
 				    ts[3], ts[2], ts[1], ts[0],
-				    // 2nd Layer sector start location, 0x01358C00 for default BD layerbreak of 12219392
+                    // 2nd Layer sector start location, 0x01358C00 for default BD layerbreak of 12219392
 				    l1ss[0], l1ss[1], l1ss[2], l1ss[3],
-				    // 2nd Layer sector end location
+                    // 2nd Layer sector end location
 				    0x01, 0xEF, 0xFF, 0xFE,
-				    // Remaining 32 bytes are zeroes
+                    // Remaining 32 bytes are zeroes
 				    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
-			    // 3k3y style: 0x03 at last byte
-			    if (exactIRD)
-				    pic[114] = 0x03;
+                // 3k3y style: 0x03 at last byte
+                if (exactIRD)
+                    pic[114] = 0x03;
 
-		    }
+            }
             else // if BD-25
             {
                 // Total sectors used on disc: num_sectors + layer_sector_end (0x00100000) - 1
@@ -233,7 +232,7 @@ namespace LibIRD
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
             }
-            
+
             return pic;
         }
 

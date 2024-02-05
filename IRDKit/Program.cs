@@ -31,7 +31,7 @@ namespace IRDKit
             public string IRDPath { get; set; }
 
             [Option('b', "layerbreak", HelpText = "Layerbreak value in bytes (use with BD-Video hybrid discs). Default: 12219392")]
-            public long? Layerbreak {  get; set; }
+            public long? Layerbreak { get; set; }
 
             [Option('k', "key", HelpText = "Hexadecimal representation of the disc key")]
             public string Key { get; set; }
@@ -68,9 +68,9 @@ namespace IRDKit
             public bool Recurse { get; set; }
         }
 
-       /// <summary>
-       /// IRD diff command
-       /// </summary>
+        /// <summary>
+        /// IRD diff command
+        /// </summary>
         [Verb("diff", HelpText = "Compare two IRDs and print their differences")]
         public class DiffOptions
         {
