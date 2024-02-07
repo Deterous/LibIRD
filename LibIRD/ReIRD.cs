@@ -59,7 +59,6 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="getKeyLog">Path to the GetKey log file</param>
-        /// <exception cref="InvalidDataException"></exception>
         public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true)
         {
             // Generate Unique Identifier using ISO CRC32
@@ -240,7 +239,6 @@ namespace LibIRD
         /// Generates the UID field by computing the CRC32 hash of the ISO
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
-        /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
         private static uint GenerateUID(string isoPath)
         {
@@ -274,7 +272,7 @@ namespace LibIRD
         /// Calculates ISO file size
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
-        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
         private static long CalculateSize(string isoPath)
         {

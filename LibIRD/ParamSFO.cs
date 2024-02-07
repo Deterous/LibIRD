@@ -43,13 +43,8 @@ namespace LibIRD
         /// Constructor using a PARAM.SFO file path
         /// </summary>
         /// <param name="sfoPath">Full file path to the PARAM.SFO file</param>
-        /// <exception cref="ArgumentNullException"></exception>
         public ParamSFO(string sfoPath)
         {
-            // Validate file path
-            if (sfoPath == null || sfoPath.Length <= 0)
-                throw new ArgumentNullException(nameof(sfoPath));
-
             // Read file as a stream, and parse file
             using FileStream fs = new(sfoPath, FileMode.Open, FileAccess.Read);
             Parse(fs);
