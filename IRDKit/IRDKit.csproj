@@ -9,7 +9,7 @@
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <LangVersion>latest</LangVersion>
 	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.4.1</Version>
+    <Version>0.4.2</Version>
     
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
@@ -27,11 +27,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LibIRD\LibIRD.csproj" />
-	<ProjectReference Include="..\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj" />
-	<ProjectReference Include="..\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj" />
+    <ProjectReference Include="..\LibIRD\LibIRD.csproj" PrivateAssets="All" />
+	<ProjectReference Include="..\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj" PrivateAssets="All" />
+	<ProjectReference Include="..\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj" PrivateAssets="All" />
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="SabreTools.RedumpLib" Version="1.3.2" />
+    <PackageReference Include="SabreTools.RedumpLib" Version="1.3.3" />
   </ItemGroup>
 
 </Project>

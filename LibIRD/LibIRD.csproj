@@ -6,7 +6,7 @@
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <LangVersion>latest</LangVersion>
 	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.4.1</Version>
+    <Version>0.4.2</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
     
     <!-- Package Properties -->
@@ -26,9 +26,9 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj" />
-    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj" />
-    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj" PrivateAssets="All" />
+    <ProjectReference Include="..\DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj" PrivateAssets="All" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
   </ItemGroup>
 
