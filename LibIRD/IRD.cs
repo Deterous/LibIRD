@@ -946,23 +946,22 @@ namespace LibIRD
                     if (fileClusters[i].Offset < smallestOffset)
                         smallestOffset = fileClusters[i].Offset;
                 }
-                int firstSector = (int)(smallestOffset);
 
                 // If already encountered file offset, skip this file
-                if (Array.Exists(FileKeys, element => element == firstSector))
+                if (Array.Exists(FileKeys, element => element == smallestOffset))
                     continue;
 
                 if (fileClusters.Length > 1)
                     Console.WriteLine($"Split file detected: {filePath}");
 
                 // Add file offset to keys
-                FileKeys[FileCount] = firstSector;
+                FileKeys[FileCount] = smallestOffset;
 
                 // Determine whether file is in encrypted or decrypted region
                 bool encrypted = false;
                 for (int i = RegionCount - 1; i > 0; i--)
                 {
-                    if (RegionStart[i] <= firstSector)
+                    if (RegionStart[i] <= smallestOffset)
                     {
                         encrypted = i % 2 == 1;
                         break;
@@ -986,7 +985,7 @@ namespace LibIRD
                             throw new InvalidFileSystemException("Disc region ended unexpectedly");
                         // Decrypt sector if necessary
                         if (encrypted)
-                            buf = DecryptSector(buf, firstSector + j);
+                            buf = DecryptSector(buf, (int)fileClusters[i].Offset + j);
                         // Hash sector
                         md5.TransformBlock(buf, 0, numBytes, null, 0);
                     }
@@ -999,7 +998,7 @@ namespace LibIRD
                             throw new InvalidFileSystemException("Disc region ended unexpectedly");
                         // Decrypt partial sector if necessary
                         if (encrypted)
-                            buf = DecryptSector(buf, firstSector + (int)(fileClusters[i].Count / SectorSize));
+                            buf = DecryptSector(buf, (int)fileClusters[i].Offset + (int)(fileClusters[i].Count / SectorSize));
                         // Hash partial sector
                         md5.TransformBlock(buf, 0, (int)(fileClusters[i].Count % SectorSize), null, 0);
                     }

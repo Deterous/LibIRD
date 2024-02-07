@@ -610,7 +610,9 @@ namespace IRDKit
                     missingOffsets1.Add(IRD2.FileKeys[i]);
             }
             // Print the file offsets that differ
-            printText.AppendLine($"File Offsets not Present in {irdPath1}: {string.Join(", ", missingOffsets1)}");
+            if (missingOffsets1.Count > 0)
+                printText.AppendLine($"File Offsets not Present in {irdPath1}: {string.Join(", ", missingOffsets1)}");
+            if (missingOffsets2.Count > 0)
             printText.AppendLine($"File Offsets not Present in {irdPath2}: {string.Join(", ", missingOffsets2)}");
 
             // Print any extra config data difference
