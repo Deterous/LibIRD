@@ -159,11 +159,13 @@ namespace IRDKit
                             }
 
                             // Determine output IRD folder
-                            string outputPath = Path.GetDirectoryName(opt.IRDPath);
+                            string outputPath = opt.IRDPath;
+                            if (File.Exists(opt.IRDPath))
+                                outputPath = Path.GetDirectoryName(opt.IRDPath);
 
                             // Create an IRD file for all ISO files found
-                            foreach (string file in isoFiles)
-                                ISO2IRD(file, irdPath: outputPath, verbose: opt.Verbose);
+                            foreach (string file in isoFiles.OrderBy(x => x))
+                                ISO2IRD(file, irdPath: outputPath, keyPath: opt.KeyFile, verbose: opt.Verbose);
                         }
                         else
                         {
@@ -719,14 +721,19 @@ namespace IRDKit
             {
                 try
                 {
+                    // If key directory was given, append filename and .key
+                    if (Directory.Exists(keyPath))
+                    {
+                        keyPath = Path.Combine(keyPath, Path.ChangeExtension(Path.GetFileName(isoPath), ".key"));
+                    }
                     // Read key from .key file
                     byte[] discKey = File.ReadAllBytes(keyPath);
                     if (discKey == null || discKey.Length != 16)
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
                     {
-                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         ird1.Write(irdPath);
                         if (verbose)
                             ird1.Print();
@@ -783,8 +790,8 @@ namespace IRDKit
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
                     {
-                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         ird1.Write(irdPath);
                         if (verbose)
                             ird1.Print();
@@ -811,8 +818,8 @@ namespace IRDKit
                 // Found .getkey.log file, check it is valid
                 try
                 {
-                    Console.WriteLine($"Creating {irdPath} with key from: {getKeyLog}");
-                    IRD ird1 = new ReIRD(isoPath, getKeyLog);
+                    Console.WriteLine($"Creating {irdPath} with key from: {logfilePath}");
+                    IRD ird1 = new ReIRD(isoPath, logfilePath);
                     ird1.Write(irdPath);
                     if (verbose)
                         ird1.Print();
