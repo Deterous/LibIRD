@@ -715,7 +715,7 @@ namespace LibIRD
             HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
             {
-                Console.WriteLine($"{isoPath} contains split files: detected {FileCount} out of {fileCount} expected files");
+                //Console.WriteLine($"{isoPath} contains split files: detected {FileCount} out of {fileCount} expected files");
                 long[] tempFileKeys = FileKeys;
                 Array.Resize(ref tempFileKeys, (int)FileCount);
                 FileKeys = tempFileKeys;
@@ -943,6 +943,9 @@ namespace LibIRD
                     if (fileClusters[i] == null)
                         throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
 
+                    if (fileClusters[i].Offset * SectorSize != fileClusters[i - 1].Offset * SectorSize + fileClusters[i - 1].Count)
+                        Console.WriteLine($"Non-contiguous file found: {filePath}");
+
                     if (fileClusters[i].Offset < smallestOffset)
                         smallestOffset = fileClusters[i].Offset;
                 }
@@ -950,9 +953,6 @@ namespace LibIRD
                 // If already encountered file offset, skip this file
                 if (Array.Exists(FileKeys, element => element == smallestOffset))
                     continue;
-
-                if (fileClusters.Length > 1)
-                    Console.WriteLine($"Split file detected: {filePath}");
 
                 // Add file offset to keys
                 FileKeys[FileCount] = smallestOffset;

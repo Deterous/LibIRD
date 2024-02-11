@@ -785,7 +785,7 @@ namespace IRDKit
                 try
                 {
                     // Read key from .key file
-                    byte[] discKey = File.ReadAllBytes(keyPath);
+                    byte[] discKey = File.ReadAllBytes(keyfilePath);
                     if (discKey == null || discKey.Length != 16)
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
