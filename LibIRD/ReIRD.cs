@@ -71,11 +71,12 @@ namespace LibIRD
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="key">Disc Key, redump-style (AES encrypted Data 1)</param>
         /// <param name="layerbreak">Layerbreak value, in sectors</param>
+        /// <param name="uid">Unique ID, crc32 hash of ISO</param>
         /// <param name="region">Disc Region</param>
-        public ReIRD(string isoPath, byte[] key, long? layerbreak = null, Region region = Region.NONE) : base()
+        public ReIRD(string isoPath, byte[] key, long? layerbreak = null, uint? uid = null, Region region = Region.NONE) : base()
         {
             // Generate Unique Identifier using ISO CRC32
-            UID = GenerateUID(isoPath);
+            UID = uid == null ? GenerateUID(isoPath) : (uint)uid;
 
             // Determine ISO file size
             long size = CalculateSize(isoPath);

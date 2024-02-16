@@ -270,7 +270,7 @@ namespace LibIRD
         /// <summary>
         /// MD5 hashes for all decrypted files in the image
         /// </summary>
-        /// <remarks><see cref="FileHashes"/> files, 16-bytes per hash, alternating with each <see cref="FileHashes"/> entry</remarks>
+        /// <remarks><see cref="FileCount"/> files, 16-bytes per hash, alternating with each <see cref="FileHashes"/> entry</remarks>
         public byte[][] FileHashes { get; private set; }
 
         /// <summary>

@@ -843,11 +843,13 @@ namespace IRDKit
 
             // Compute CRC32 hash
             byte[] crc32;
+            uint crc32UInt;
             using (FileStream fs = File.OpenRead(isoPath))
             {
                 Crc32 hasher = new();
                 hasher.Append(fs);
                 crc32 = hasher.GetCurrentHash();
+                crc32UInt = BitConverter.ToUInt32(crc32);
                 // Change endianness
                 Array.Reverse(crc32);
             }
@@ -905,7 +907,7 @@ namespace IRDKit
             Console.WriteLine($"Creating {irdPath} with Key from redump.org: {Convert.ToHexString(key)}");
             try
             {
-                IRD ird = new ReIRD(isoPath, key, layerbreak);
+                IRD ird = new ReIRD(isoPath, key, layerbreak, crc32UInt);
                 ird.Write(irdPath);
                 if (verbose)
                     ird.Print();
