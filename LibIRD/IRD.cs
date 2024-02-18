@@ -715,7 +715,6 @@ namespace LibIRD
             HashFiles(fs, reader, rootDir);
             if (FileCount != fileCount)
             {
-                //Console.WriteLine($"{isoPath} contains split files: detected {FileCount} out of {fileCount} expected files");
                 long[] tempFileKeys = FileKeys;
                 Array.Resize(ref tempFileKeys, (int)FileCount);
                 FileKeys = tempFileKeys;
@@ -891,8 +890,8 @@ namespace LibIRD
             RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
 
             // Determine MD5 hashes for each region
-            using MD5 md5 = MD5.Create();
-            byte[] buf = new byte[SectorSize];
+            int bufSectors = 1024;
+            byte[] buf = new byte[bufSectors * SectorSize];
             for (int i = 0; i < RegionCount; i++)
             {
                 // Start reading data from first sector of region
@@ -900,19 +899,32 @@ namespace LibIRD
 
                 // Compute MD5 hash for just the region portion of the ISO file
                 int numBytes;
-                for (long j = RegionStart[i]; j <= RegionEnd[i]; j++)
+                using MD5 md5 = MD5.Create();
+                int regionSectors = (int)(RegionEnd[i] - RegionStart[i]) + 1;
+                for (int j = bufSectors; j <= regionSectors; j += bufSectors)
                 {
-                    // Read one sector at a time
+                    // Read into buffer
                     numBytes = fs.Read(buf, 0, buf.Length);
-                    // Check that an entire sector was read
+                    // TODO: Process partial buffer if non-zero is returned
                     if (numBytes < buf.Length)
                         throw new InvalidFileSystemException("Disc region ended unexpectedly");
-                    // Process MD5 sum one sector at a time
+
+                    // Process MD5 sum
                     md5.TransformBlock(buf, 0, buf.Length, null, 0);
                 }
 
+                // Read any remaining sectors
+                int bufRemainder = (int)(SectorSize * (regionSectors % bufSectors));
+                if (bufRemainder != 0)
+                {
+                    numBytes = fs.Read(buf, 0, bufRemainder);
+                    // TODO: Process partial buffer if non-zero is returned
+                    if (numBytes < bufRemainder)
+                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
+                }
+
                 // Compute and store MD5 hash of region
-                md5.TransformFinalBlock(buf, 0, 0);
+                md5.TransformFinalBlock(buf, 0, bufRemainder);
                 RegionHashes[i] = md5.Hash;
             }
         }
@@ -938,13 +950,14 @@ namespace LibIRD
 
                 // Determine smallest file offset as first sector
                 long smallestOffset = fileClusters[0].Offset;
+                bool nonContiguous = false;
                 for (int i = 1; i < fileClusters.Length; i++)
                 {
                     if (fileClusters[i] == null)
                         throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
 
                     if (fileClusters[i].Offset * SectorSize != fileClusters[i - 1].Offset * SectorSize + fileClusters[i - 1].Count)
-                        Console.WriteLine($"Non-contiguous file found: {filePath}");
+                        nonContiguous = true;
 
                     if (fileClusters[i].Offset < smallestOffset)
                         smallestOffset = fileClusters[i].Offset;
@@ -953,6 +966,8 @@ namespace LibIRD
                 // If already encountered file offset, skip this file
                 if (Array.Exists(FileKeys, element => element == smallestOffset))
                     continue;
+                else if (nonContiguous)
+                    Console.WriteLine($"Non-contiguous file found: {filePath}");
 
                 // Add file offset to keys
                 FileKeys[FileCount] = smallestOffset;
@@ -968,39 +983,47 @@ namespace LibIRD
                     }
                 }
 
-                // Hash each non-contiguous portion of the ISO file
-                byte[] buf = new byte[SectorSize];
-                MD5 md5 = MD5.Create();
+                // Read one sector at a time for small files
+                int bufSectors = (fileClusters[0].Count < 1024 * SectorSize) ? 1 : 1024;
+                byte[] buf = new byte[bufSectors * SectorSize];
+
+                // Hash each non-contiguous portion of the file
+                using MD5 md5 = MD5.Create();
                 for (int i = 0; i < fileClusters.Length; i++)
                 {
-                    // Start reading data from the beginning of the ISO file
+                    // Start reading data from the beginning of the current extent
                     fs.Seek(fileClusters[i].Offset * SectorSize, SeekOrigin.Begin);
                     int numBytes;
-                    // Read all data before the first data sector
-                    for (int j = 0; j < (fileClusters[i].Count / SectorSize); j++)
+                    // Read file in buffers
+                    long fileSectors = fileClusters[i].Count / SectorSize;
+                    for (int j = 0; j <= fileSectors - bufSectors; j += bufSectors)
                     {
                         numBytes = fs.Read(buf, 0, buf.Length);
-                        // Check that an entire sector was read
-                        if (numBytes < buf.Length)
+                        // TODO: Process partial buffer if non-zero is returned
+                        if (numBytes != buf.Length)
                             throw new InvalidFileSystemException("Disc region ended unexpectedly");
-                        // Decrypt sector if necessary
+
+                        // Decrypt buffer if necessary
                         if (encrypted)
-                            buf = DecryptSector(buf, (int)fileClusters[i].Offset + j);
+                            DecryptSectors(ref buf, (int)fileClusters[i].Offset + j);
+
                         // Hash sector
-                        md5.TransformBlock(buf, 0, numBytes, null, 0);
+                        md5.TransformBlock(buf, 0, buf.Length, null, 0);
                     }
-                    // Read remaining partial sector
-                    if (fileClusters[i].Count % SectorSize != 0)
+                    // Read remaining partial buffer
+                    if ((fileClusters[i].Count % buf.Length) > 0)
                     {
                         numBytes = fs.Read(buf, 0, buf.Length);
-                        // Check that an entire sector was read
-                        if (numBytes < buf.Length)
+                        // TODO: Process partial buffer if non-zero is returned
+                        if (numBytes != buf.Length)
                             throw new InvalidFileSystemException("Disc region ended unexpectedly");
-                        // Decrypt partial sector if necessary
+
+                        // Decrypt buffer if necessary
                         if (encrypted)
-                            buf = DecryptSector(buf, (int)fileClusters[i].Offset + (int)(fileClusters[i].Count / SectorSize));
-                        // Hash partial sector
-                        md5.TransformBlock(buf, 0, (int)(fileClusters[i].Count % SectorSize), null, 0);
+                            DecryptSectors(ref buf, (int)fileClusters[i].Offset + bufSectors * (int)(fileClusters[i].Count / buf.Length));
+
+                        // Hash partial buffer
+                        md5.TransformBlock(buf, 0, (int)(fileClusters[i].Count % buf.Length), null, 0);
                     }
                 }
 
@@ -1018,38 +1041,49 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Decrypts a given sector byte array
+        /// Decrypts a given byte array of sector(s)
         /// </summary>
-        /// <param name="sector">Byte array to be decrypted</param>
+        /// <param name="buffer">Byte array to be decrypted</param>
+        /// <param name="offset">Number of bytes to decrypt</param>
         /// <exception cref="InvalidOperationException"></exception>
-        private protected byte[] DecryptSector(byte[] sector, int sectorNumber)
+        private protected void DecryptSectors(ref byte[] buffer, int sectorNumber)
         {
+            ArgumentNullException.ThrowIfNull(buffer);
+
+            if (buffer.Length == 0 || buffer.Length % SectorSize != 0)
+                throw new ArgumentException("Encrypted buffer must be multiple of SectorSize");
+
             // Setup AES decryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
-
             // Set AES settings
             aes.Key = DiscKey;
             aes.Padding = PaddingMode.None;
             aes.Mode = CipherMode.CBC;
 
-            // Determine Initial Value based on sector number
-            byte[] iv = new byte[16];
-            for (int i = 0; i < 16; i++)
+            // Decrypt buffer one sector at a time
+            for (int i = 0; i < buffer.Length; i += (int)SectorSize)
             {
-                byte a = (byte)(sectorNumber & 0xFF);
-                iv[16 - i - 1] = (byte)(sectorNumber & 0xFF);
-                sectorNumber >>= 8;
+                // Determine AES Initial Value based on sector number
+                byte[] iv = new byte[16];
+                int tempNum = sectorNumber;
+                for (int j = 0; j < 16; j++)
+                {
+                    iv[16 - j - 1] = (byte)(tempNum & 0xFF);
+                    tempNum >>= 8;
+                }
+                aes.IV = iv;
+
+                // Perform AES decryption
+                using MemoryStream stream = new();
+                using CryptoStream cs = new(stream, aes.CreateDecryptor(), CryptoStreamMode.Write);
+                cs.Write(buffer, i, (int)SectorSize);
+                cs.FlushFinalBlock();
+
+                // Write decrypted sector to output
+                stream.ToArray().CopyTo(buffer, i);
+                sectorNumber++;
             }
-            aes.IV = iv;
-
-            // Perform AES decryption
-            using MemoryStream stream = new();
-            using ICryptoTransform dec = aes.CreateDecryptor();
-            using CryptoStream cs = new(stream, dec, CryptoStreamMode.Write);
-            cs.Write(sector, 0, sector.Length);
-            cs.FlushFinalBlock();
-
-            return stream.ToArray();
+            return;
         }
 
         /// <summary>
