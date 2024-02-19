@@ -300,6 +300,11 @@ namespace LibIRD
         /// </summary>
         private long[] RegionEnd { get; set; }
 
+        /// <summary>
+        /// File extents to hash
+        /// </summary>
+        private Range<long, long>[][] FileExtents { get; set; }
+
         #endregion
 
         #region Constructors
@@ -351,11 +356,9 @@ namespace LibIRD
 
         /// <summary>
         /// Default constructor for internal derived classes only: resulting object not in usable state
+        /// Assumes that internally derived class will set fields in its own constructor
         /// </summary>
-        private protected IRD()
-        {
-            // Assumes that internally derived class will set fields in its own constructor
-        }
+        private protected IRD() { }
 
         /// <summary>
         /// Constructor with given required fields
@@ -697,29 +700,43 @@ namespace LibIRD
             // Read and compress the ISO footer
             GetFooter(fs);
 
-            // Process all regions on ISO
-            HashRegions(fs);
-
-            // TODO: Speed up program by hashing regions and files at the same time (read from filesystem only once)
+            // Get info region info from ISO
+            GetRegions(fs);
 
             // Recursively count all files in ISO to allocate file arrays
             DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
             FileCount = 0;
             CountFiles(rootDir);
+            // Pre-allocate arrays and reset file count
             FileKeys = new long[FileCount];
-            FileHashes = new byte[FileCount][];
-
-            // Determine file offsets and hashes
+            FileExtents = new Range<long, long>[FileCount][];
             uint fileCount = FileCount;
             FileCount = 0;
-            HashFiles(fs, reader, rootDir);
+            // Determine file offsets
+            GetFiles(fs, reader, rootDir);
+            FileHashes = new byte[FileCount][];
+
+            // Resize arrays if non-contiguous files were detected
             if (FileCount != fileCount)
             {
                 long[] tempFileKeys = FileKeys;
                 Array.Resize(ref tempFileKeys, (int)FileCount);
                 FileKeys = tempFileKeys;
+                Range<long, long>[][] tempFileExtents = FileExtents;
+                Array.Resize(ref tempFileExtents, (int)FileCount);
+                FileExtents = tempFileExtents;
             }
-            Array.Sort(FileKeys, FileHashes);
+            // Sort files by offset
+            Array.Sort(FileKeys, FileExtents);
+
+            // Calculate CRC32 hash of ISO only if generating a redump IRD and the UID is not already set
+            HashISO(fs, redump && UID == 0x00000000);
+
+            // Determine region hashes
+            HashRegions(fs);
+
+            // Determine file hashes
+            HashFiles(fs);
         }
 
         #endregion
@@ -731,7 +748,7 @@ namespace LibIRD
         /// </summary>
         /// <remarks>PS3UPDAT.PUP update file version number</remarks>
         /// <param name="fs">ISO filestream</param>
-        /// <param name="reader"></param>
+        /// <param name="reader">CDReader</param>
         /// <exception cref="InvalidFileSystemException"></exception>
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
@@ -774,7 +791,7 @@ namespace LibIRD
         /// Retreives and stores the header
         /// </summary>
         /// <param name="fs">ISO filestream</param>
-        /// <param name="reader"></param>
+        /// <param name="reader">CDReader</param>
         /// <exception cref="InvalidFileSystemException"></exception>
         private void GetHeader(FileStream fs, CDReader reader)
         {
@@ -844,11 +861,11 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Determines and stores the hashes for each disc region
+        /// Retreives and stores the Region extents
         /// </summary>
-        /// <param name="fs"></param>
+        /// <param name="fs">ISO filestream</param>
         /// <exception cref="InvalidFileSystemException"></exception>
-        private void HashRegions(FileStream fs)
+        private void GetRegions(FileStream fs)
         {
             // Determine the number of unencryted regions
             fs.Seek(0, SeekOrigin.Begin);
@@ -888,7 +905,15 @@ namespace LibIRD
             RegionStart[0] = FirstDataSector;
             // Remove footer from last region
             RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
+        }
 
+        /// <summary>
+        /// Determines and stores the hashes for each disc region
+        /// </summary>
+        /// <param name="fs">ISO filestream</param>
+        /// <exception cref="InvalidFileSystemException"></exception>
+        private void HashRegions(FileStream fs)
+        {
             // Determine MD5 hashes for each region
             int bufSectors = 1024;
             byte[] buf = new byte[bufSectors * SectorSize];
@@ -930,11 +955,12 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Determine and store hashes for all files and files within subdirectories recursively
+        /// Determine and store file extents for all files and files within subdirectories recursively
         /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="path"></param>
-        private void HashFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
+        /// <param name="fs">ISO filestream</param>
+        /// <param name="reader">CDReader</param>
+        /// <param name="dir">Folder to search for files within</param>
+        private void GetFiles(FileStream fs, CDReader reader, DiscDirectoryInfo dir)
         {
             // Process all files in current directory
             foreach (DiscFileInfo fileInfo in dir.GetFiles())
@@ -942,25 +968,25 @@ namespace LibIRD
                 string filePath = fileInfo.FullName;
 
                 // Determine the extents of the file via clusters
-                Range<long, long>[] fileClusters = reader.PathToClusters(filePath);
+                Range<long, long>[] fileExtent = reader.PathToClusters(filePath);
 
                 // If invalid clusters were returned, we can't hash this file
-                if (fileClusters == null && fileClusters.Length == 0)
+                if (fileExtent == null && fileExtent.Length == 0)
                     throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
 
                 // Determine smallest file offset as first sector
-                long smallestOffset = fileClusters[0].Offset;
+                long smallestOffset = fileExtent[0].Offset;
                 bool nonContiguous = false;
-                for (int i = 1; i < fileClusters.Length; i++)
+                for (int i = 1; i < fileExtent.Length; i++)
                 {
-                    if (fileClusters[i] == null)
+                    if (fileExtent[i] == null)
                         throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
 
-                    if (fileClusters[i].Offset * SectorSize != fileClusters[i - 1].Offset * SectorSize + fileClusters[i - 1].Count)
+                    if (fileExtent[i].Offset * SectorSize != fileExtent[i - 1].Offset * SectorSize + fileExtent[i - 1].Count)
                         nonContiguous = true;
 
-                    if (fileClusters[i].Offset < smallestOffset)
-                        smallestOffset = fileClusters[i].Offset;
+                    if (fileExtent[i].Offset < smallestOffset)
+                        smallestOffset = fileExtent[i].Offset;
                 }
 
                 // If already encountered file offset, skip this file
@@ -969,14 +995,35 @@ namespace LibIRD
                 else if (nonContiguous)
                     Console.WriteLine($"Non-contiguous file found: {filePath}");
 
-                // Add file offset to keys
+                // Add file offset to keys and extents to extents
                 FileKeys[FileCount] = smallestOffset;
+                FileExtents[FileCount] = fileExtent;
+                FileCount++;
+            }
 
+            // Recursively process all subfolders of current directory
+            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
+            {
+                GetFiles(fs, reader, dirInfo);
+            }
+        }
+
+        /// <summary>
+        /// Calculate hashes for all file extents
+        /// </summary>
+        /// <param name="fs">ISO filestream</param>
+        private void HashFiles(FileStream fs)
+        {
+            // Process all files in current directory
+            int bufSectors = 1024;
+            byte[] buf = new byte[bufSectors * SectorSize];
+            for (int file = 0; file < FileCount; file++)
+            {
                 // Determine whether file is in encrypted or decrypted region
                 bool encrypted = false;
                 for (int i = RegionCount - 1; i > 0; i--)
                 {
-                    if (RegionStart[i] <= smallestOffset)
+                    if (RegionStart[i] <= FileKeys[file])
                     {
                         encrypted = i % 2 == 1;
                         break;
@@ -984,18 +1031,18 @@ namespace LibIRD
                 }
 
                 // Read one sector at a time for small files
-                int bufSectors = (fileClusters[0].Count < 1024 * SectorSize) ? 1 : 1024;
-                byte[] buf = new byte[bufSectors * SectorSize];
+                //int bufSectors = FileExtents[file][0].Count > 1024 * SectorSize ? 1024 : 32;
+                //byte[] buf = new byte[bufSectors * SectorSize];
 
                 // Hash each non-contiguous portion of the file
                 using MD5 md5 = MD5.Create();
-                for (int i = 0; i < fileClusters.Length; i++)
+                for (int i = 0; i < FileExtents[file].Length; i++)
                 {
                     // Start reading data from the beginning of the current extent
-                    fs.Seek(fileClusters[i].Offset * SectorSize, SeekOrigin.Begin);
+                    fs.Seek(FileExtents[file][i].Offset * SectorSize, SeekOrigin.Begin);
                     int numBytes;
                     // Read file in buffers
-                    long fileSectors = fileClusters[i].Count / SectorSize;
+                    long fileSectors = FileExtents[file][i].Count / SectorSize;
                     for (int j = 0; j <= fileSectors - bufSectors; j += bufSectors)
                     {
                         numBytes = fs.Read(buf, 0, buf.Length);
@@ -1005,13 +1052,13 @@ namespace LibIRD
 
                         // Decrypt buffer if necessary
                         if (encrypted)
-                            DecryptSectors(ref buf, (int)fileClusters[i].Offset + j);
+                            DecryptSectors(ref buf, (int)FileExtents[file][i].Offset + j);
 
                         // Hash sector
                         md5.TransformBlock(buf, 0, buf.Length, null, 0);
                     }
                     // Read remaining partial buffer
-                    if ((fileClusters[i].Count % buf.Length) > 0)
+                    if ((FileExtents[file][i].Count % buf.Length) > 0)
                     {
                         numBytes = fs.Read(buf, 0, buf.Length);
                         // TODO: Process partial buffer if non-zero is returned
@@ -1020,23 +1067,16 @@ namespace LibIRD
 
                         // Decrypt buffer if necessary
                         if (encrypted)
-                            DecryptSectors(ref buf, (int)fileClusters[i].Offset + bufSectors * (int)(fileClusters[i].Count / buf.Length));
+                            DecryptSectors(ref buf, (int)FileExtents[file][i].Offset + bufSectors * (int)(FileExtents[file][i].Count / buf.Length));
 
                         // Hash partial buffer
-                        md5.TransformBlock(buf, 0, (int)(fileClusters[i].Count % buf.Length), null, 0);
+                        md5.TransformBlock(buf, 0, (int)(FileExtents[file][i].Count % buf.Length), null, 0);
                     }
                 }
 
                 // Finalise and store MD5 hash
                 md5.TransformFinalBlock(buf, 0, 0);
-                FileHashes[FileCount] = md5.Hash;
-                FileCount++;
-            }
-
-            // Recursively process all subfolders of current directory
-            foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
-            {
-                HashFiles(fs, reader, dirInfo);
+                FileHashes[file] = md5.Hash;
             }
         }
 
@@ -1095,6 +1135,67 @@ namespace LibIRD
             FileCount += (uint)dir.GetFiles().Length;
             foreach (DiscDirectoryInfo dirInfo in dir.GetDirectories())
                 CountFiles(dirInfo);
+        }
+
+        /// <summary>
+        /// Calculate hashes for all region and file extents
+        /// </summary>
+        /// <param name="fs">ISO filestream</param>
+        /// <param name="redump">True if also calculating CRC32 of entire ISO</param>
+        private void HashISO(FileStream fs, bool redump)
+        {
+            // Initialise CRC32 ISO hasher, only used if making redump-style IRD
+            byte[] crc32;
+            Crc32 isoHasher = new();
+
+            // Initialise MD5 region hashes
+            int currentRegion = 0;
+            MD5[] regionHashers = new MD5[RegionCount];
+            for (int i = 0; i < RegionCount;  i++)
+                regionHashers[i] = MD5.Create();
+
+            // Initialise MD5 file hashes
+            int currentFile = 0;
+            MD5[] fileHashers = new MD5[FileCount];
+            for (int i = 0; i < FileCount; i++)
+                fileHashers[i] = MD5.Create();
+
+            // Start hashing from beginning of ISO
+            fs.Seek(0, SeekOrigin.Begin);
+
+            // Read from ISO 1024 sectors at a time
+            int bufSectors = 1024;
+            byte[] buf = new byte[bufSectors * SectorSize];
+            while (true)
+            {
+                // Attempt to read a full buffer
+                int numBytes = fs.Read(buf, 0, buf.Length);
+                // If end of ISO reached, stop reading
+                if (numBytes == 0)
+                    break;
+                // Partial buffer read, process partial read
+                else if (numBytes == buf.Length)
+                {
+                    if (redump)
+                        isoHasher.Append(buf);
+                }
+                // Process full buffer
+                else
+                {
+                    if (redump)
+                        isoHasher.Append(buf[..numBytes]);
+                }
+            }
+            currentRegion = currentFile;
+            currentFile = currentRegion;
+
+            // Save CRC32 hash to UID field, if making redump-style IRD
+            if (redump)
+            {
+                crc32 = isoHasher.GetCurrentHash();
+                UID = BitConverter.ToUInt32(crc32, 0);
+            }
+            
         }
 
         #endregion

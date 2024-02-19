@@ -59,11 +59,7 @@ namespace LibIRD
         /// </summary>
         /// <param name="isoPath">Path to the ISO</param>
         /// <param name="getKeyLog">Path to the GetKey log file</param>
-        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true)
-        {
-            // Generate Unique Identifier using ISO CRC32
-            UID = GenerateUID(isoPath);
-        }
+        public ReIRD(string isoPath, string getKeyLog) : base(isoPath, getKeyLog, true) { }
 
         /// <summary>
         /// Constructor with optional additional region to generate a specific Disc ID
@@ -75,8 +71,8 @@ namespace LibIRD
         /// <param name="region">Disc Region</param>
         public ReIRD(string isoPath, byte[] key, long? layerbreak = null, uint? uid = null, Region region = Region.NONE) : base()
         {
-            // Generate Unique Identifier using ISO CRC32
-            UID = uid == null ? GenerateUID(isoPath) : (uint)uid;
+            // If the ISO CRC32 is provided, use it as the Unique ID
+            UID = uid == null ? 0x00000000 : (uint)uid;
 
             // Determine ISO file size
             long size = CalculateSize(isoPath);
