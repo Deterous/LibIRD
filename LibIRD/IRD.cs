@@ -2,6 +2,7 @@
 using DiscUtils.Iso9660;
 using DiscUtils.Streams;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -621,7 +622,7 @@ namespace LibIRD
         private protected void GenerateIRD(string isoPath, bool redump = false)
         {
             // Parse ISO file as a file stream
-            using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
+            using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan) ?? throw new FileNotFoundException(isoPath);
             // Validate ISO file stream
             if (!CDReader.Detect(fs))
                 throw new InvalidFileSystemException("Not a valid ISO file");
@@ -707,14 +708,15 @@ namespace LibIRD
             DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
             FileCount = 0;
             CountFiles(rootDir);
+
             // Pre-allocate arrays and reset file count
             FileKeys = new long[FileCount];
             FileExtents = new Range<long, long>[FileCount][];
             uint fileCount = FileCount;
             FileCount = 0;
+
             // Determine file offsets
             GetFiles(fs, reader, rootDir);
-            FileHashes = new byte[FileCount][];
 
             // Resize arrays if non-contiguous files were detected
             if (FileCount != fileCount)
@@ -730,13 +732,9 @@ namespace LibIRD
             Array.Sort(FileKeys, FileExtents);
 
             // Calculate CRC32 hash of ISO only if generating a redump IRD and the UID is not already set
+            RegionHashes = new byte[RegionCount][];
+            FileHashes = new byte[FileCount][];
             HashISO(fs, redump && UID == 0x00000000);
-
-            // Determine region hashes
-            HashRegions(fs);
-
-            // Determine file hashes
-            HashFiles(fs);
         }
 
         #endregion
@@ -876,7 +874,6 @@ namespace LibIRD
             RegionCount = (byte)(2 * ((uint)decRegionCount[3]) - 1);
             if (RegionCount <= 0)
                 throw new InvalidFileSystemException("No regions detected in ISO");
-            RegionHashes = new byte[RegionCount][];
             RegionStart = new long[RegionCount];
             RegionEnd = new long[RegionCount];
 
@@ -905,53 +902,6 @@ namespace LibIRD
             RegionStart[0] = FirstDataSector;
             // Remove footer from last region
             RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
-        }
-
-        /// <summary>
-        /// Determines and stores the hashes for each disc region
-        /// </summary>
-        /// <param name="fs">ISO filestream</param>
-        /// <exception cref="InvalidFileSystemException"></exception>
-        private void HashRegions(FileStream fs)
-        {
-            // Determine MD5 hashes for each region
-            int bufSectors = 1024;
-            byte[] buf = new byte[bufSectors * SectorSize];
-            for (int i = 0; i < RegionCount; i++)
-            {
-                // Start reading data from first sector of region
-                fs.Seek(SectorSize * RegionStart[i], SeekOrigin.Begin);
-
-                // Compute MD5 hash for just the region portion of the ISO file
-                int numBytes;
-                using MD5 md5 = MD5.Create();
-                int regionSectors = (int)(RegionEnd[i] - RegionStart[i]) + 1;
-                for (int j = bufSectors; j <= regionSectors; j += bufSectors)
-                {
-                    // Read into buffer
-                    numBytes = fs.Read(buf, 0, buf.Length);
-                    // TODO: Process partial buffer if non-zero is returned
-                    if (numBytes < buf.Length)
-                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
-
-                    // Process MD5 sum
-                    md5.TransformBlock(buf, 0, buf.Length, null, 0);
-                }
-
-                // Read any remaining sectors
-                int bufRemainder = (int)(SectorSize * (regionSectors % bufSectors));
-                if (bufRemainder != 0)
-                {
-                    numBytes = fs.Read(buf, 0, bufRemainder);
-                    // TODO: Process partial buffer if non-zero is returned
-                    if (numBytes < bufRemainder)
-                        throw new InvalidFileSystemException("Disc region ended unexpectedly");
-                }
-
-                // Compute and store MD5 hash of region
-                md5.TransformFinalBlock(buf, 0, bufRemainder);
-                RegionHashes[i] = md5.Hash;
-            }
         }
 
         /// <summary>
@@ -1009,89 +959,27 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Calculate hashes for all file extents
-        /// </summary>
-        /// <param name="fs">ISO filestream</param>
-        private void HashFiles(FileStream fs)
-        {
-            // Process all files in current directory
-            int bufSectors = 1024;
-            byte[] buf = new byte[bufSectors * SectorSize];
-            for (int file = 0; file < FileCount; file++)
-            {
-                // Determine whether file is in encrypted or decrypted region
-                bool encrypted = false;
-                for (int i = RegionCount - 1; i > 0; i--)
-                {
-                    if (RegionStart[i] <= FileKeys[file])
-                    {
-                        encrypted = i % 2 == 1;
-                        break;
-                    }
-                }
-
-                // Read one sector at a time for small files
-                //int bufSectors = FileExtents[file][0].Count > 1024 * SectorSize ? 1024 : 32;
-                //byte[] buf = new byte[bufSectors * SectorSize];
-
-                // Hash each non-contiguous portion of the file
-                using MD5 md5 = MD5.Create();
-                for (int i = 0; i < FileExtents[file].Length; i++)
-                {
-                    // Start reading data from the beginning of the current extent
-                    fs.Seek(FileExtents[file][i].Offset * SectorSize, SeekOrigin.Begin);
-                    int numBytes;
-                    // Read file in buffers
-                    long fileSectors = FileExtents[file][i].Count / SectorSize;
-                    for (int j = 0; j <= fileSectors - bufSectors; j += bufSectors)
-                    {
-                        numBytes = fs.Read(buf, 0, buf.Length);
-                        // TODO: Process partial buffer if non-zero is returned
-                        if (numBytes != buf.Length)
-                            throw new InvalidFileSystemException("Disc region ended unexpectedly");
-
-                        // Decrypt buffer if necessary
-                        if (encrypted)
-                            DecryptSectors(ref buf, (int)FileExtents[file][i].Offset + j);
-
-                        // Hash sector
-                        md5.TransformBlock(buf, 0, buf.Length, null, 0);
-                    }
-                    // Read remaining partial buffer
-                    if ((FileExtents[file][i].Count % buf.Length) > 0)
-                    {
-                        numBytes = fs.Read(buf, 0, buf.Length);
-                        // TODO: Process partial buffer if non-zero is returned
-                        if (numBytes != buf.Length)
-                            throw new InvalidFileSystemException("Disc region ended unexpectedly");
-
-                        // Decrypt buffer if necessary
-                        if (encrypted)
-                            DecryptSectors(ref buf, (int)FileExtents[file][i].Offset + bufSectors * (int)(FileExtents[file][i].Count / buf.Length));
-
-                        // Hash partial buffer
-                        md5.TransformBlock(buf, 0, (int)(FileExtents[file][i].Count % buf.Length), null, 0);
-                    }
-                }
-
-                // Finalise and store MD5 hash
-                md5.TransformFinalBlock(buf, 0, 0);
-                FileHashes[file] = md5.Hash;
-            }
-        }
-
-        /// <summary>
         /// Decrypts a given byte array of sector(s)
         /// </summary>
         /// <param name="buffer">Byte array to be decrypted</param>
-        /// <param name="offset">Number of bytes to decrypt</param>
+        /// <param name="sectorNumber">Sector number of first sector being decrypted</param>
+        /// <param name="offset">Number of sectors to skip</param>
+        /// <param name="count">Number of sectors to decrypt, beginning from offset</param>
         /// <exception cref="InvalidOperationException"></exception>
-        private protected void DecryptSectors(ref byte[] buffer, int sectorNumber)
+        private protected void DecryptSectors(ref byte[] buffer, int sectorNumber, int offset = 0, int? count = null)
         {
             ArgumentNullException.ThrowIfNull(buffer);
 
             if (buffer.Length == 0 || buffer.Length % SectorSize != 0)
                 throw new ArgumentException("Encrypted buffer must be multiple of SectorSize");
+
+            if (offset < 0 || offset >= buffer.Length / SectorSize)
+                throw new ArgumentException("Offset sector must be within buffer");
+
+            count ??= (int)(buffer.Length / SectorSize) - offset;
+
+            if (count < 0 || count > (buffer.Length / SectorSize) - offset)
+                throw new ArgumentException("Number of sectors must be within buffer");
 
             // Setup AES decryption
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
@@ -1100,8 +988,11 @@ namespace LibIRD
             aes.Padding = PaddingMode.None;
             aes.Mode = CipherMode.CBC;
 
+            // Convert offset and count to number of bytes
+            offset *= (int)SectorSize;
+            count *= (int)SectorSize;
             // Decrypt buffer one sector at a time
-            for (int i = 0; i < buffer.Length; i += (int)SectorSize)
+            for (int i = offset; i < offset + count; i += (int)SectorSize)
             {
                 // Determine AES Initial Value based on sector number
                 byte[] iv = new byte[16];
@@ -1149,53 +1040,186 @@ namespace LibIRD
             Crc32 isoHasher = new();
 
             // Initialise MD5 region hashes
-            int currentRegion = 0;
-            MD5[] regionHashers = new MD5[RegionCount];
+            List<int> regions = [];
+            MD5[] regionMD5 = new MD5[RegionCount];
             for (int i = 0; i < RegionCount;  i++)
-                regionHashers[i] = MD5.Create();
+            {
+                regions.Add(i);
+                regionMD5[i] = MD5.Create();
+            }
 
             // Initialise MD5 file hashes
-            int currentFile = 0;
-            MD5[] fileHashers = new MD5[FileCount];
+            List<int> files = [];
+            MD5[] fileMD5 = new MD5[FileCount];
             for (int i = 0; i < FileCount; i++)
-                fileHashers[i] = MD5.Create();
+            {
+                files.Add(i);
+                fileMD5[i] = MD5.Create();
+            }
 
             // Start hashing from beginning of ISO
-            fs.Seek(0, SeekOrigin.Begin);
+            long currentSector = 0;
+            fs.Seek(currentSector, SeekOrigin.Begin);
 
-            // Read from ISO 1024 sectors at a time
+            // Read from ISO, 1024 sectors at a time
             int bufSectors = 1024;
             byte[] buf = new byte[bufSectors * SectorSize];
             while (true)
             {
                 // Attempt to read a full buffer
+                bufSectors = 1024;
                 int numBytes = fs.Read(buf, 0, buf.Length);
+
                 // If end of ISO reached, stop reading
                 if (numBytes == 0)
-                    break;
-                // Partial buffer read, process partial read
-                else if (numBytes == buf.Length)
                 {
+                    // If making redump-style IRD, save CRC32 hash to UID field
                     if (redump)
-                        isoHasher.Append(buf);
+                    {
+                        crc32 = isoHasher.GetCurrentHash();
+                        UID = BitConverter.ToUInt32(crc32, 0);
+                    }
+                    return;
                 }
-                // Process full buffer
-                else
-                {
-                    if (redump)
-                        isoHasher.Append(buf[..numBytes]);
-                }
-            }
-            currentRegion = currentFile;
-            currentFile = currentRegion;
 
-            // Save CRC32 hash to UID field, if making redump-style IRD
-            if (redump)
-            {
-                crc32 = isoHasher.GetCurrentHash();
-                UID = BitConverter.ToUInt32(crc32, 0);
-            }
-            
+                // Keep trying to read to fill buffer, remove once partial buffer hashing is supported
+                if (numBytes != buf.Length)
+                {
+                    while (numBytes % SectorSize != 0)
+                    {
+                        int newNumBytes = fs.Read(buf, numBytes, buf.Length - numBytes);
+                        numBytes += newNumBytes;
+
+                        // If end of ISO reached, trim buffer and hash
+                        if (newNumBytes == 0 && numBytes % SectorSize != 0)
+                        {
+                            //numBytes -= numBytes % (int)SectorSize;
+                            Console.Error.WriteLine("ERROR: ISO filestream ended early");
+                            break;
+                        }
+                    }
+                    // Only hash portion of buffer
+                    bufSectors = numBytes / (int)SectorSize;
+                    if (bufSectors == 0)
+                        Console.Error.WriteLine("ERROR: Trailing partial sector in ISO filestream");
+                    if (numBytes > buf.Length)
+                        throw new InvalidFileSystemException("ERROR: Read more bytes than buffer size???");
+                }
+
+                // Hash ISO
+                if (redump)
+                    isoHasher.Append(new ReadOnlySpan<byte>(buf, 0, numBytes));
+
+                // Hash regions
+                List<int> regionsEnded = [];
+                foreach (int i in regions)
+                {
+                    // Stop hashing regions if current region has not yet started (assumes regions are ordered)
+                    if (RegionStart[i] > currentSector + bufSectors)
+                        break;
+
+                    // Skip region if it has already ended
+                    //if (RegionEnd[i] < currentSector)
+                    //    continue;
+
+                    // Check if region has ended in this buffer [We know: Start is not in the future, Ending is not in the past]
+                    if (RegionEnd[i] < currentSector + bufSectors)
+                    {
+                        // Determine start byte, if region is entirely within the buffer
+                        int startByte = RegionStart[i] > currentSector ? (int)(SectorSize * (RegionStart[i] - currentSector)) : 0;
+                        // Determine end byte
+                        int endByte = (int)(SectorSize * (RegionEnd[i] - currentSector + 1));
+                        // Close region hash
+                        regionMD5[i].TransformFinalBlock(buf, startByte, endByte - startByte);
+                        RegionHashes[i] = regionMD5[i].Hash;
+                        regionMD5[i].Clear();
+                        regionsEnded.Add(i);
+                    }
+                    // Check if region has already begun
+                    else if (RegionStart[i] <= currentSector)
+                    {
+                        // Hash buffer
+                        regionMD5[i].TransformBlock(buf, 0, (int)SectorSize * bufSectors, null, 0);
+                    }
+                    // Region Start is in this buffer, ending is in the future
+                    else
+                    {
+                        // Hash partial buffer
+                        int regionStart = (int)(SectorSize * (RegionStart[i] - currentSector));
+                        regionMD5[i].TransformBlock(buf, regionStart, (int)SectorSize * bufSectors - regionStart, null, 0);
+                    }
+                }
+                if (regionsEnded.Count > 0)
+                    regions.RemoveAll(item => regionsEnded.Contains(item));
+
+                // Decrypt any encrypted sectors of buffer
+                for (int i = 1; i < RegionCount; i += 2)
+                {
+                    // If the current encrypted region is within the buffer
+                    if (RegionStart[i] < currentSector + bufSectors
+                        && RegionEnd[i] >= currentSector)
+                    {
+                        // First sector to decrypt from
+                        int encOffset = 0;
+
+                        // Don't decrypt initial sectors if the encrypted region starts within this buffer
+                        if (RegionStart[i] > currentSector)
+                            encOffset = (int)(RegionStart[i] - currentSector);
+
+                        // Number of sectors to decrypt
+                        int encCount = bufSectors - encOffset;
+
+                        // Don't decrypt last sectors if the encrypted region ends within this buffer
+                        if (RegionEnd[i] < currentSector + bufSectors)
+                            encCount -= (int)(currentSector + bufSectors - RegionEnd[i] + 1);
+
+                        // Decrypt encrypted sectors
+                        DecryptSectors(ref buf, (int)currentSector + encOffset, encOffset, encCount);
+                    }
+                }
+
+                // Hash files
+                List<int> filesEnded = [];
+                foreach (int i in files)
+                {
+                    // Stop hashing files if current file has not yet started (assumes FileKeys are sorted)
+                    if (FileKeys[i] > currentSector + bufSectors)
+                        break;
+
+                    // Hash each file extent for each file
+                    for (int j = 0; j < FileExtents[i].Length; j++)
+                    {
+                        // Skip hashing file extent if it has not yet started or already ended
+                        if (FileExtents[i][j].Offset > currentSector + bufSectors
+                            || SectorSize* FileExtents[i][j].Offset + FileExtents[i][j].Count < SectorSize * currentSector)
+                            continue;
+                        // Determine first file byte location in buffer
+                        int startByte = FileExtents[i][j].Offset > currentSector ? (int)(SectorSize * (FileExtents[i][j].Offset - currentSector)) : 0;
+                        // Determine last file byte location in buffer
+                        int endByte = (int)(FileExtents[i][j].Count - SectorSize * (currentSector - FileExtents[i][j].Offset));
+                        // Don't hash more than the buffer size
+                        endByte = endByte < bufSectors * (int)SectorSize ? endByte : bufSectors * (int)SectorSize;
+                        // Hash portion of buffer that file exists in
+                        fileMD5[i].TransformBlock(buf, startByte, endByte - startByte, null, 0);
+                    }
+
+                    // Check if current file has ended in this buffer (assumes last extent contains last byte)
+                    long lastByte = SectorSize * FileExtents[i][^1].Offset + FileExtents[i][^1].Count;
+                    if (lastByte < SectorSize * (currentSector + bufSectors)
+                        && lastByte > SectorSize * currentSector)
+                    {
+                        // Close file hash
+                        fileMD5[i].TransformFinalBlock(buf, 0, 0);
+                        FileHashes[i] = fileMD5[i].Hash;
+                        fileMD5[i].Clear();
+                        filesEnded.Add(i);
+                    }
+                }
+                if (filesEnded.Count > 0)
+                    files.RemoveAll(item => filesEnded.Contains(item));
+
+                currentSector += bufSectors;
+            }            
         }
 
         #endregion
@@ -1265,7 +1289,12 @@ namespace LibIRD
 
                 // Hashes for each region
                 for (int i = 0; i < RegionCount; i++)
-                    bw.Write(RegionHashes[i], 0, 16);
+                {
+                    if (RegionHashes[i] == null)
+                        bw.Write(NullMD5);
+                    else
+                        bw.Write(RegionHashes[i], 0, 16);
+                }
 
                 // Number of files hashed
                 bw.Write(FileCount);

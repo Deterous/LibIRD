@@ -704,14 +704,9 @@ namespace IRDKit
                         return irdPath;
                     }
                 }
-                catch (ArgumentException e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                    return null;
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.Error.WriteLine("File not found, failed to create IRD");
                     return null;
                 }
             }
@@ -740,14 +735,9 @@ namespace IRDKit
                         return irdPath;
                     }
                 }
-                catch (ArgumentException e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                    return null;
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.Error.WriteLine("File not found, failed to create IRD");
                     return null;
                 }
             }
@@ -764,14 +754,9 @@ namespace IRDKit
                         ird1.Print();
                     return irdPath;
                 }
-                catch (ArgumentException e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                    return null;
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.Error.WriteLine("File not found, failed to create IRD");
                     return null;
                 }
             }
@@ -798,14 +783,9 @@ namespace IRDKit
                         return irdPath;
                     }
                 }
-                catch (ArgumentException e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                    return null;
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.Error.WriteLine("File not found, failed to create IRD");
                     return null;
                 }
             }
@@ -825,14 +805,9 @@ namespace IRDKit
                         ird1.Print();
                     return irdPath;
                 }
-                catch (ArgumentException e)
+                catch (Exception e)
                 {
                     Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                    return null;
-                }
-                catch (FileNotFoundException)
-                {
-                    Console.Error.WriteLine("File not found, failed to create IRD");
                     return null;
                 }
             }
@@ -913,14 +888,9 @@ namespace IRDKit
                     ird.Print();
                 return irdPath;
             }
-            catch (ArgumentException e)
+            catch (Exception e)
             {
                 Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                return null;
-            }
-            catch (FileNotFoundException)
-            {
-                Console.Error.WriteLine("File not found, failed to create IRD");
                 return null;
             }
         }

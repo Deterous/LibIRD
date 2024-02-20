@@ -131,7 +131,7 @@ namespace LibIRD
                 if (layerbreak >= 2 * BDLayerSize || layerbreak % SectorSize != 0)
                     throw new ArgumentException("Unexpected layerbreak value", nameof(size));
             }
-            else
+            else if (size > BDLayerSize)
             {
                 // If no layerbreak provided, ensure ISO is not BD-Video hybrid
                 using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
