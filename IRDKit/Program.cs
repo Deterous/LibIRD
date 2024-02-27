@@ -11,6 +11,7 @@ using System.IO.Hashing;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 
 namespace IRDKit
 {
@@ -24,7 +25,7 @@ namespace IRDKit
         [Verb("create", HelpText = "Create an IRD from an ISO")]
         public class CreateOptions
         {
-            [Value(0, Required = true, HelpText = "Path to an ISO file, or directory of ISO files")]
+            [Value(0, Required = true, HelpText = "Path to ISO file(s), or directory of ISO files")]
             public IEnumerable<string> ISOPath { get; set; }
 
             [Option('o', "output", HelpText = "Path to the IRD file to be created (will overwrite)")]
@@ -55,7 +56,7 @@ namespace IRDKit
         [Verb("info", HelpText = "Print information from an IRD or ISO")]
         public class InfoOptions
         {
-            [Value(0, Required = true, HelpText = "Path to an IRD or ISO file, or directory of IRD and/or ISO files")]
+            [Value(0, Required = true, HelpText = "Path to IRD/ISO file(s), or directory of IRD/ISO files")]
             public IEnumerable<string> InPath { get; set; }
 
             [Option('o', "output", HelpText = "Path to the text or json file to be created (will overwrite)")]
@@ -84,6 +85,31 @@ namespace IRDKit
             public string OutPath { get; set; }
         }
 
+        /// <summary>
+        /// IRD rename command
+        /// </summary>
+        [Verb("rename", HelpText = "Rename one or more IRD files according to the redump PS3 DAT")]
+        public class RenameOptions
+        {
+            [Value(0, Required = true, HelpText = "Path to IRD file(s), or directory of IRD files")]
+            public IEnumerable<string> IRDPath { get; set; }
+
+            [Option('d', "datfile", Required = true, HelpText = "Path to the redump PS3 Datfile")]
+            public string DATPath { get; set; }
+
+            [Option('s', "serial", HelpText = "Appends disc serial to new IRD filename")]
+            public bool Serial { get; set; }
+
+            [Option('c', "crc", HelpText = "Appends ISO CRC to new IRD filename")]
+            public bool CRC { get; set; }
+
+            [Option('r', "recurse", HelpText = "Recurse through all subdirectories and rename all IRDs")]
+            public bool Recurse { get; set; }
+
+            [Option('v', "verbose", HelpText = "Print more information about the renaming")]
+            public bool Verbose { get; set; }
+        }
+
         #endregion
 
         #region Program
@@ -98,7 +124,7 @@ namespace IRDKit
             Console.OutputEncoding = Encoding.UTF8;
 
             // Parse arguments
-            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions, DiffOptions>(args).WithParsed(Run);
+            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions, DiffOptions, RenameOptions>(args).WithParsed(Run);
         }
 
         /// <summary>
@@ -173,7 +199,7 @@ namespace IRDKit
                             if (!File.Exists(isoPath))
                             {
                                 Console.Error.WriteLine($"ISO not found: {isoPath}");
-                                return;
+                                continue;
                             }
 
                             string irdPath;
@@ -327,6 +353,99 @@ namespace IRDKit
 
                     if (opt.OutPath != null && opt.OutPath != "")
                         Console.WriteLine($"Diff saved to {opt.OutPath}");
+
+                    break;
+
+                // Process options from a 'rename' command
+                case RenameOptions opt:
+
+                    // Validate required parameters
+                    if (opt.IRDPath == null || !opt.IRDPath.Any())
+                    {
+                        Console.Error.WriteLine("Provide a valid IRD path to rename");
+                        return;
+                    }
+
+                    // Read DAT file
+                    XDocument datfile = DatParser(opt.DATPath);
+                    if (datfile == null)
+                    {
+                        Console.Error.WriteLine("Unable to parse DAT file");
+                        return;
+                    }
+
+                    foreach (string irdPath in opt.IRDPath)
+                    {
+                        // Validate IRD path
+                        if (string.IsNullOrEmpty(irdPath))
+                            continue;
+
+                        // If directory, search for all ISOs in current directory
+                        if (Directory.Exists(irdPath))
+                        {
+                            // If recurse option enabled, search recursively
+                            IEnumerable<string> irdFiles;
+                            if (opt.Recurse)
+                            {
+                                if (opt.Verbose && irdPath == ".")
+                                    Console.WriteLine($"Recursively renaming IRDs in current directory");
+                                else if (opt.Verbose)
+                                    Console.WriteLine($"Recursively renaming IRDs in {irdPath}");
+                                irdFiles = Directory.EnumerateFiles(irdPath, "*.ird", SearchOption.AllDirectories);
+                            }
+                            else
+                            {
+                                if (opt.Verbose && irdPath == ".")
+                                    Console.WriteLine($"Renaming IRDs in current directory");
+                                else if (opt.Verbose)
+                                    Console.WriteLine($"Renaming IRDs in {irdPath}");
+                                irdFiles = Directory.EnumerateFiles(irdPath, "*.ird", SearchOption.TopDirectoryOnly);
+                            }
+
+                            // Warn if no files are found
+                            if (!irdFiles.Any())
+                            {
+                                if (opt.Recurse)
+                                    Console.Error.WriteLine($"No IRDs found in {irdPath} (ensure .ird extension)");
+                                else
+                                    Console.Error.WriteLine($"No IRDs found in {irdPath} (ensure .ird extension, or try use -r)");
+                                continue;
+                            }
+
+                            // Rename all IRD files found
+                            foreach (string file in irdFiles.OrderBy(x => x))
+                            {
+                                try
+                                {
+                                    RenameIRD(file, datfile, serial: opt.Serial, crc: opt.CRC, verbose: opt.Verbose);
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.Error.WriteLine(e);
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            // Check that given file exists
+                            if (!File.Exists(irdPath))
+                            {
+                                Console.Error.WriteLine($"IRD not found: {irdPath}");
+                                continue;
+                            }
+
+                            // Rename provided IRD path
+                            try
+                            {
+                                RenameIRD(irdPath, datfile, serial: opt.Serial, crc: opt.CRC, verbose: opt.Verbose);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.Error.WriteLine(e);
+                            }
+                        }
+                    }
 
                     break;
 
@@ -892,6 +1011,65 @@ namespace IRDKit
             {
                 Console.Error.WriteLine(e.Message + ", failed to create IRD");
                 return null;
+            }
+        }
+
+        public static XDocument DatParser(string datpath = null)
+        {
+            try
+            {
+                if (!File.Exists(datpath))
+                    return null;
+
+                return XDocument.Load(datpath);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static string GetDatFilename(IRD ird, XDocument datfile)
+        {
+            string crc32 = ird.UID.ToString("X8").ToLower();
+            XElement node = datfile.Root.Elements("game").Where(e => e.Element("rom").Attribute("crc").Value == crc32).FirstOrDefault() ?? throw new ArgumentException("Cannot find ISO in redump DAT");
+            return node.Attribute("name").Value;
+        }
+
+        public static void RenameIRD(string irdPath, XDocument datfile, bool serial = false, bool crc = false, bool verbose = false)
+        {
+            IRD ird = IRD.Read(irdPath);
+
+            if (ird.ExtraConfig != 0x0001)
+                throw new ArgumentException($"{irdPath} is not a redump-style IRD");
+
+            string filename = GetDatFilename(ird, datfile);
+            if (filename == null)
+                throw new ArgumentException($"Cannot determine DAT filename for {irdPath}");
+            if (serial)
+                filename += $" [{ird.TitleID[..4]}-{ird.TitleID[4..9]}]";
+            if (crc)
+                filename += $" [{ird.UID:X8}]";
+
+            // Rename irdPath to filename
+            string directory = Path.GetDirectoryName(Path.GetFullPath(filename));
+            string filepath;
+            if (!string.IsNullOrEmpty(directory))
+                filepath = Path.Combine(Path.GetDirectoryName(irdPath), filename + ".ird");
+            else
+                filepath = filename + ".ird";
+
+            // Rename IRD to new name
+            if (irdPath != filepath)
+            {
+                if (verbose)
+                    Console.WriteLine($"Renaming {Path.GetFileName(irdPath)} to {Path.GetFileName(filepath)}");
+                File.Move(irdPath, filepath);
+            }
+            else
+            {
+                if (verbose)
+                    Console.WriteLine($"Skipping {Path.GetFileName(irdPath)}, already named correctly");
             }
         }
 
