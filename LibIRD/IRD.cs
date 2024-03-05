@@ -563,7 +563,7 @@ namespace LibIRD
             if (discKeyStr.Length != 32)
                 throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
             // Convert Disc Key to byte array
-            discKey = Convert.FromHexString(discKeyStr);
+            discKey = HexStringToByteArray(discKeyStr);
 
             // Read Disc ID
             byte[] discID;
@@ -578,7 +578,7 @@ namespace LibIRD
             // Replace X's in Disc ID with 00000001
             discIDStr = discIDStr[..24] + "00000001";
             // Convert Disc ID to byte array
-            discID = Convert.FromHexString(discIDStr);
+            discID = HexStringToByteArray(discIDStr);
 
             // Look for PIC in log
             byte[] discPIC;
@@ -593,7 +593,7 @@ namespace LibIRD
             if (discPICStr.Length != 256)
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");
             // Convert PIC to byte array
-            discPIC = Convert.FromHexString(discPICStr[..230]);
+            discPIC = HexStringToByteArray(discPICStr[..230]);
 
             // Double check for warnings in .getkey.log
             while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
@@ -968,7 +968,8 @@ namespace LibIRD
         /// <exception cref="InvalidOperationException"></exception>
         private protected void DecryptSectors(ref byte[] buffer, int sectorNumber, int offset = 0, int? count = null)
         {
-            ArgumentNullException.ThrowIfNull(buffer);
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
 
             if (buffer.Length == 0 || buffer.Length % SectorSize != 0)
                 throw new ArgumentException("Encrypted buffer must be multiple of SectorSize");
@@ -1492,9 +1493,9 @@ namespace LibIRD
             if (Attachments != 0x0000)
                 printText.AppendLine($"Attachments:  {Attachments:X4}");
             printText.AppendLine($"Unique ID:    {UID:X8}");
-            printText.AppendLine($"Data 1 Key:   {Convert.ToHexString(Data1Key)}");
-            printText.AppendLine($"Data 2 Key:   {Convert.ToHexString(Data2Key)}");
-            printText.AppendLine($"PIC:          {Convert.ToHexString(PIC)}");
+            printText.AppendLine($"Data 1 Key:   {ByteArrayToHexString(Data1Key)}");
+            printText.AppendLine($"Data 2 Key:   {ByteArrayToHexString(Data2Key)}");
+            printText.AppendLine($"PIC:          {ByteArrayToHexString(PIC)}");
             printText.AppendLine();
 
             if (printPath == null)
@@ -1537,9 +1538,9 @@ namespace LibIRD
             if (Attachments != 0x0000)
                 json.AppendLine($"  \"Attachments\": \"{Attachments:X4}\",");
             json.AppendLine($"  \"Unique ID\": \"{UID:X8}\",");
-            json.AppendLine($"  \"Data 1 Key\": \"{Convert.ToHexString(Data1Key)}\",");
-            json.AppendLine($"  \"Data 2 Key\": \"{Convert.ToHexString(Data2Key)}\",");
-            json.AppendLine($"  \"PIC\": \"{Convert.ToHexString(PIC)}\"");
+            json.AppendLine($"  \"Data 1 Key\": \"{ByteArrayToHexString(Data1Key)}\",");
+            json.AppendLine($"  \"Data 2 Key\": \"{ByteArrayToHexString(Data2Key)}\",");
+            json.AppendLine($"  \"PIC\": \"{ByteArrayToHexString(PIC)}\"");
             if (single)
                 json.AppendLine("}");
             else
@@ -1559,6 +1560,66 @@ namespace LibIRD
                 // Write to path
                 System.IO.File.AppendAllText(jsonPath, json.ToString());
             }
+        }
+
+        #endregion
+
+        #region Helper Functions
+
+        /// <summary>
+        /// Converts a hex string into a byte array
+        /// </summary>
+        /// <param name="hex">Hex string</param>
+        /// <returns>Converted byte array, or null if invalid hex string</returns>
+        public static byte[] HexStringToByteArray(string hexString)
+        {
+            // Valid hex string must be an even number of characters
+            if (string.IsNullOrEmpty(hexString) || hexString!.Length % 2 == 1)
+                return null;
+
+            // Convert ASCII to byte via lookup table
+            int[] hexLookup = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F];
+            byte[] byteArray = new byte[hexString.Length / 2];
+            for (int i = 0; i < hexString.Length; i += 2)
+            {
+                // Convert next two chars to ASCII value relative to '0'
+                int a = Char.ToUpper(hexString[i]) - '0';
+                int b = Char.ToUpper(hexString[i + 1]) - '0';
+
+                // Ensure hex string only has '0' through '9' and 'A' through 'F' (case insensitive)
+                if ((a < 0 || b < 0 || a > 22 || b > 22) || (a > 10 && a < 17) || (b > 10 && b < 17))
+                    return null;
+                byteArray[i / 2] = (byte)(hexLookup[a] << 4 | hexLookup[b]);
+            }
+
+            return byteArray;
+        }
+
+        /// <summary>
+        /// Converts a byte array into a hex string
+        /// </summary>
+        /// <param name="byteArray">Byte array</param>
+        /// <returns>Hex string representation of byte array, null if invalid</returns>
+        public static string ByteArrayToHexString(byte[] byteArray)
+        {
+            // Validate byte array
+            if (byteArray == null || byteArray.Length == 0)
+                return null;
+
+            // Store map of values to hex string
+            string hex = "0123456789ABCDEF";
+
+            // Add two characters per byte value
+            StringBuilder hexString = new(2 * byteArray.Length);
+            foreach (byte b in byteArray)
+            {
+                hexString.Append(hex[(int)(b >> 4)]);
+                hexString.Append(hex[(int)(b & 0x0F)]);
+            }
+
+            // Return hex string
+            return hexString.ToString();
         }
 
         #endregion
