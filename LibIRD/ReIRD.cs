@@ -133,7 +133,7 @@ namespace LibIRD
             {
                 // If no layerbreak provided, ensure ISO is not BD-Video hybrid
                 using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read) ?? throw new FileNotFoundException(isoPath);
-                DiscUtils.Iso9660.CDReader reader = new(fs, true, true);
+                DiscUtils.Iso9660.CDReader reader = new(fs);
                 if (reader.DirectoryExists("\\BDMV"))
                     throw new ArgumentException("Layerbreak must be provided for BD-Video hybrid discs");
                 // Assume disc has default layerbreak

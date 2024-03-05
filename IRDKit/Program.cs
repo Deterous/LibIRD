@@ -292,7 +292,7 @@ namespace IRDKit
                                 {
                                     PrintISO(file, opt.Json, file.Equals(lastISO), opt.OutPath);
                                 }
-                                catch (LibIRD.DiscUtils.InvalidFileSystemException)
+                                catch (IOException)
                                 {
                                     // Not a valid ISO file despite extension, assume file is an IRD
                                     if (!opt.Json)
@@ -473,7 +473,7 @@ namespace IRDKit
                     PrintISO(inPath, json, single, outPath);
                     return;
                 }
-                catch (LibIRD.DiscUtils.InvalidFileSystemException)
+                catch (IOException)
                 {
                     // Not a valid ISO file despite extension, try open as IRD
                 }
@@ -529,7 +529,7 @@ namespace IRDKit
                 return;
             }
             // Create new ISO reader
-            using LibIRD.DiscUtils.Iso9660.CDReader reader = new(fs, true, true);
+            using LibIRD.DiscUtils.Iso9660.CDReader reader = new(fs);
 
             // Write PS3_DISC.SFB info
             try

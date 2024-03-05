@@ -618,17 +618,17 @@ namespace LibIRD
         /// <param name="redump">True if redump-style IRD</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="FileNotFoundException"></exception>
-        /// <exception cref="InvalidFileSystemException"></exception>
+        /// <exception cref="IOException"></exception>
         private protected void GenerateIRD(string isoPath, bool redump = false)
         {
             // Parse ISO file as a file stream
             using FileStream fs = new FileStream(isoPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan) ?? throw new FileNotFoundException(isoPath);
             // Validate ISO file stream
             if (!CDReader.Detect(fs))
-                throw new InvalidFileSystemException("Not a valid ISO file");
+                throw new IOException("Not a valid ISO file");
 
             // New ISO Reader from DiscUtils
-            CDReader reader = new(fs, true, true);
+            CDReader reader = new(fs);
 
             // If generating redump-style IRD
             if (redump)
@@ -747,13 +747,13 @@ namespace LibIRD
         /// <remarks>PS3UPDAT.PUP update file version number</remarks>
         /// <param name="fs">ISO filestream</param>
         /// <param name="reader">CDReader</param>
-        /// <exception cref="InvalidFileSystemException"></exception>
+        /// <exception cref="IOException"></exception>
         private void GetSystemVersion(FileStream fs, CDReader reader)
         {
             // Determine PUP file offset via cluster
             Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
             if (updateClusters == null && updateClusters.Length == 0 && updateClusters[0] == null)
-                throw new InvalidFileSystemException("Invalid file extents for PS3UPDAT.PUP");
+                throw new IOException("Invalid file extents for PS3UPDAT.PUP");
 
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
             UpdateOffset = SectorSize * updateClusters[0].Offset;
@@ -791,13 +791,13 @@ namespace LibIRD
         /// </summary>
         /// <param name="fs">ISO filestream</param>
         /// <param name="reader">CDReader</param>
-        /// <exception cref="InvalidFileSystemException"></exception>
+        /// <exception cref="IOException"></exception>
         private void GetHeader(FileStream fs, CDReader reader)
         {
             // Determine the extent of the header via cluster (Sector 0 to first data sector)
             Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
             if (sfbClusters == null && sfbClusters.Length == 0 && sfbClusters[0] == null)
-                throw new InvalidFileSystemException("Invalid file extents for PS3_DISC.SFB");
+                throw new IOException("Invalid file extents for PS3_DISC.SFB");
             // End of header is at beginning of first byte of dedicated cluster
             FirstDataSector = sfbClusters[0].Offset;
 
@@ -867,7 +867,7 @@ namespace LibIRD
         /// Retreives and stores the Region extents
         /// </summary>
         /// <param name="fs">ISO filestream</param>
-        /// <exception cref="InvalidFileSystemException"></exception>
+        /// <exception cref="IOException"></exception>
         private void GetRegions(FileStream fs)
         {
             // Determine the number of unencryted regions
@@ -878,7 +878,7 @@ namespace LibIRD
             // Total number of regions is 2x number of unencrypted regions, minus 1
             RegionCount = (byte)(2 * ((uint)decRegionCount[3]) - 1);
             if (RegionCount <= 0)
-                throw new InvalidFileSystemException("No regions detected in ISO");
+                throw new IOException("No regions detected in ISO");
             RegionStart = new long[RegionCount];
             RegionEnd = new long[RegionCount];
 
@@ -928,7 +928,7 @@ namespace LibIRD
 
                 // If invalid clusters were returned, we can't hash this file
                 if (fileExtent == null && fileExtent.Length == 0)
-                    throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
+                    throw new IOException($"Unexpected file extents for {filePath}");
 
                 // Determine smallest file offset as first sector
                 long smallestOffset = fileExtent[0].Offset;
@@ -936,7 +936,7 @@ namespace LibIRD
                 for (int i = 1; i < fileExtent.Length; i++)
                 {
                     if (fileExtent[i] == null)
-                        throw new InvalidFileSystemException($"Unexpected file extents for {filePath}");
+                        throw new IOException($"Unexpected file extents for {filePath}");
 
                     if (fileExtent[i].Offset * SectorSize != fileExtent[i - 1].Offset * SectorSize + fileExtent[i - 1].Count)
                         nonContiguous = true;
@@ -1110,7 +1110,7 @@ namespace LibIRD
                     if (bufSectors == 0)
                         Console.Error.WriteLine("ERROR: Trailing partial sector in ISO filestream");
                     if (numBytes > buf.Length)
-                        throw new InvalidFileSystemException("ERROR: Read more bytes than buffer size???");
+                        throw new IOException("ERROR: Read more bytes than buffer size???");
                 }
 
                 // Hash ISO
