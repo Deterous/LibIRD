@@ -1042,7 +1042,7 @@ namespace LibIRD
             // Initialise MD5 region hashes
             List<int> regions = [];
             MD5[] regionMD5 = new MD5[RegionCount];
-            for (int i = 0; i < RegionCount;  i++)
+            for (int i = 0; i < RegionCount; i++)
             {
                 regions.Add(i);
                 regionMD5[i] = MD5.Create();
@@ -1191,7 +1191,7 @@ namespace LibIRD
                     {
                         // Skip hashing file extent if it has not yet started or already ended
                         if (FileExtents[i][j].Offset > currentSector + bufSectors
-                            || SectorSize* FileExtents[i][j].Offset + FileExtents[i][j].Count < SectorSize * currentSector)
+                            || SectorSize * FileExtents[i][j].Offset + FileExtents[i][j].Count < SectorSize * currentSector)
                             continue;
                         // Determine first file byte location in buffer
                         int startByte = FileExtents[i][j].Offset > currentSector ? (int)(SectorSize * (FileExtents[i][j].Offset - currentSector)) : 0;
@@ -1219,7 +1219,7 @@ namespace LibIRD
                     files.RemoveAll(item => filesEnded.Contains(item));
 
                 currentSector += bufSectors;
-            }            
+            }
         }
 
         #endregion

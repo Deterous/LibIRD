@@ -732,7 +732,7 @@ namespace IRDKit
             if (missingOffsets1.Count > 0)
                 printText.AppendLine($"File Offsets not Present in {irdPath1}: {string.Join(", ", missingOffsets1)}");
             if (missingOffsets2.Count > 0)
-            printText.AppendLine($"File Offsets not Present in {irdPath2}: {string.Join(", ", missingOffsets2)}");
+                printText.AppendLine($"File Offsets not Present in {irdPath2}: {string.Join(", ", missingOffsets2)}");
 
             // Print any extra config data difference
             if (IRD1.ExtraConfig != IRD2.ExtraConfig)
