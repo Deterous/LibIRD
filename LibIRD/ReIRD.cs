@@ -1,6 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.IO.Hashing;
+using SabreTools.Hashing;
 
 namespace LibIRD
 {
@@ -252,13 +252,8 @@ namespace LibIRD
                 throw new FileNotFoundException(nameof(isoPath));
 
             // Compute CRC32 hash
-            byte[] crc32;
-            using (FileStream fs = File.OpenRead(isoPath))
-            {
-                Crc32 hasher = new();
-                hasher.Append(fs);
-                crc32 = hasher.GetCurrentHash();
-            }
+            string crc32String = HashTool.GetFileHash(isoPath, HashType.CRC32); // TODO: Output byte[] once ST.Hashing supports it
+            byte[] crc32 = HexStringToByteArray(crc32String);
 
             // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
             return BitConverter.ToUInt32(crc32, 0);

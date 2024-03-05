@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.IO.Hashing;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 using CommandLine;
 using LibIRD;
+using SabreTools.Hashing;
 using SabreTools.RedumpLib.Web;
 
 namespace IRDKit
@@ -704,7 +704,7 @@ namespace IRDKit
             for (int i = 0; i < regionCount; i++)
             {
                 if (!IRD1.RegionHashes[i].SequenceEqual(IRD2.RegionHashes[i]))
-                    printText.AppendLine($"Region {i} Hash: {Convert.ToHexString(IRD1.RegionHashes[i])} vs {Convert.ToHexString(IRD2.RegionHashes[i])}");
+                    printText.AppendLine($"Region {i} Hash: {LibIRD.IRD.ByteArrayToHexString(IRD1.RegionHashes[i])} vs {LibIRD.IRD.ByteArrayToHexString(IRD2.RegionHashes[i])}");
             }
 
             // Print the difference in number of files, if not 0
@@ -720,7 +720,7 @@ namespace IRDKit
                 if (j == -1)
                     missingOffsets2.Add(IRD1.FileKeys[i]);
                 if (j != -1 && !IRD1.FileHashes[i].SequenceEqual(IRD2.FileHashes[j]))
-                    printText.AppendLine($"File Hash at Offset {IRD1.FileKeys[i]}: {Convert.ToHexString(IRD1.FileHashes[i])} vs {Convert.ToHexString(IRD2.FileHashes[j])}");
+                    printText.AppendLine($"File Hash at Offset {IRD1.FileKeys[i]}: {LibIRD.IRD.ByteArrayToHexString(IRD1.FileHashes[i])} vs {LibIRD.IRD.ByteArrayToHexString(IRD2.FileHashes[j])}");
             }
             for (int i = 0; i < IRD2.FileKeys.Length; i++)
             {
@@ -748,15 +748,15 @@ namespace IRDKit
 
             // Print any data 1 key difference
             if (!IRD1.Data1Key.SequenceEqual(IRD2.Data1Key))
-                printText.AppendLine($"Data 1 Key: {Convert.ToHexString(IRD1.Data1Key)} vs {Convert.ToHexString(IRD2.Data1Key)}");
+                printText.AppendLine($"Data 1 Key: {LibIRD.IRD.ByteArrayToHexString(IRD1.Data1Key)} vs {LibIRD.IRD.ByteArrayToHexString(IRD2.Data1Key)}");
 
             // Print any data 2 key difference
             if (!IRD1.Data2Key.SequenceEqual(IRD2.Data2Key))
-                printText.AppendLine($"Data 2 Key: {Convert.ToHexString(IRD1.Data2Key)} vs {Convert.ToHexString(IRD2.Data2Key)}");
+                printText.AppendLine($"Data 2 Key: {LibIRD.IRD.ByteArrayToHexString(IRD1.Data2Key)} vs {LibIRD.IRD.ByteArrayToHexString(IRD2.Data2Key)}");
 
             // Print any PIC difference
             if (!IRD1.PIC.SequenceEqual(IRD2.PIC))
-                printText.AppendLine($"PIC: {Convert.ToHexString(IRD1.PIC)} vs {Convert.ToHexString(IRD2.PIC)}");
+                printText.AppendLine($"PIC: {LibIRD.IRD.ByteArrayToHexString(IRD1.PIC)} vs {LibIRD.IRD.ByteArrayToHexString(IRD2.PIC)}");
 
             // Write formatted string to file if output path provided, otherwise to console
             if (outPath != null)
@@ -808,7 +808,7 @@ namespace IRDKit
                 try
                 {
                     // Get disc key from hex string
-                    byte[] discKey = Convert.FromHexString(hexKey);
+                    byte[] discKey = LibIRD.IRD.HexStringToByteArray(hexKey);
                     if (discKey == null || discKey.Length != 16)
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
@@ -844,7 +844,7 @@ namespace IRDKit
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
                     {
-                        Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        Console.WriteLine($"Creating {irdPath} with Key: {LibIRD.IRD.ByteArrayToHexString(discKey)}");
                         IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         ird1.Write(irdPath);
                         if (verbose)
@@ -892,7 +892,7 @@ namespace IRDKit
                         Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
                     else
                     {
-                        Console.WriteLine($"Creating {irdPath} with Key: {Convert.ToHexString(discKey)}");
+                        Console.WriteLine($"Creating {irdPath} with Key: {LibIRD.IRD.ByteArrayToHexString(discKey)}");
                         IRD ird1 = new ReIRD(isoPath, discKey, layerbreak);
                         ird1.Write(irdPath);
                         if (verbose)
@@ -934,22 +934,17 @@ namespace IRDKit
                 Console.WriteLine("No key provided... Searching for key on redump.org");
 
             // Compute CRC32 hash
-            byte[] crc32;
-            uint crc32UInt;
-            using (FileStream fs = File.OpenRead(isoPath))
-            {
-                Crc32 hasher = new();
-                hasher.Append(fs);
-                crc32 = hasher.GetCurrentHash();
-                crc32UInt = BitConverter.ToUInt32(crc32);
-                // Change endianness
-                Array.Reverse(crc32);
-            }
-            string crc32_hash = Convert.ToHexString(crc32).ToLower();
+            string crc32String = HashTool.GetFileHash(isoPath, HashType.CRC32); // TODO: Output byte[] once ST.Hashing supports it
+            uint crc32UInt = BitConverter.ToUInt32(LibIRD.IRD.HexStringToByteArray(crc32String), 0);
 
             // Search for ISO on redump.org
+#if !NETFRAMEWORK
             RedumpHttpClient redump = new();
-            List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32_hash).ConfigureAwait(false).GetAwaiter().GetResult();
+            List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32String).ConfigureAwait(false).GetAwaiter().GetResult();
+#else
+            RedumpWebClient redump = new();
+            List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32String);
+#endif
             int id;
             if (ids.Count == 0)
             {
@@ -965,10 +960,14 @@ namespace IRDKit
                     SHA1 hasher = SHA1.Create();
                     sha1 = hasher.ComputeHash(fs);
                 }
-                string sha1_hash = Convert.ToHexString(sha1).ToLower();
+                string sha1_hash = LibIRD.IRD.ByteArrayToHexString(sha1).ToLower();
 
                 // Search redump.org for SHA1 hash
+#if !NETFRAMEWORK
                 List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1_hash).ConfigureAwait(false).GetAwaiter().GetResult();
+#else
+                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1_hash);
+#endif
                 if (ids2.Count == 0)
                 {
                     Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
@@ -988,7 +987,11 @@ namespace IRDKit
             }
 
             // Download key file from redump.org
+#if !NETFRAMEWORK
             byte[] key = redump.GetByteArrayAsync($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
+#else
+            byte[] key = redump.DownloadData($"http://redump.org/disc/{id}/key");
+#endif
             if (key.Length != 16)
             {
                 Console.Error.WriteLine("Invalid key obtained from redump and no valid key provided, cannot create IRD");
@@ -996,7 +999,7 @@ namespace IRDKit
             }
 
             // Create IRD with key from redump
-            Console.WriteLine($"Creating {irdPath} with Key from redump.org: {Convert.ToHexString(key)}");
+            Console.WriteLine($"Creating {irdPath} with Key from redump.org: {LibIRD.IRD.ByteArrayToHexString(key)}");
             try
             {
                 IRD ird = new ReIRD(isoPath, key, layerbreak, crc32UInt);
@@ -1045,7 +1048,7 @@ namespace IRDKit
             if (filename == null)
                 throw new ArgumentException($"Cannot determine DAT filename for {irdPath}");
             if (serial)
-                filename += $" [{ird.TitleID[..4]}-{ird.TitleID[4..9]}]";
+                filename += $" [{ird.TitleID.Substring(0, 4)}-{ird.TitleID.Substring(5, 5)}]";
             if (crc)
                 filename += $" [{ird.UID:X8}]";
 
@@ -1071,7 +1074,7 @@ namespace IRDKit
             }
         }
 
-        #endregion
+#endregion
 
         #region Helper Functions
 

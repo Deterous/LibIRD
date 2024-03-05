@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
 using LibIRD.DiscUtils;
 using LibIRD.DiscUtils.Iso9660;
 using LibIRD.DiscUtils.Streams;
+using SabreTools.Hashing;
 
 namespace LibIRD
 {
@@ -803,9 +803,11 @@ namespace LibIRD
             // Begin a GZip stream to write header to
             using MemoryStream headerStream = new();
 #if NET6_0_OR_GREATER
-            using (GZipStream gzs = new(headerStream, CompressionLevel.SmallestSize))
+            using GZipStream gzStream = new(headerStream, CompressionLevel.SmallestSize);
+#elif NETCOREAPP || NET45_OR_GREATER
+            using GZipStream gzStream = new(headerStream, CompressionLevel.Optimal);
 #else
-            using (GZipStream gzs = new(headerStream, CompressionLevel.Optimal))
+            using GZipStream gzStream = new(headerStream, CompressionMode.Compress);
 #endif
             {
                 // Start reading data from the beginning of the ISO file
@@ -817,7 +819,7 @@ namespace LibIRD
                 for (int i = 0; i < FirstDataSector; i++)
                 {
                     numBytes = fs.Read(buf, 0, buf.Length);
-                    gzs.Write(buf, 0, numBytes);
+                    gzStream.Write(buf, 0, numBytes);
                 }
             }
 
@@ -835,9 +837,11 @@ namespace LibIRD
             // Begin a GZip stream to write footer to
             using MemoryStream footerStream = new();
 #if NET6_0_OR_GREATER
-            using (GZipStream gzs = new(footerStream, CompressionLevel.SmallestSize))
+            using GZipStream gzStream = new(footerStream, CompressionLevel.SmallestSize);
+#elif NETCOREAPP || NET45_OR_GREATER
+            using GZipStream gzStream = new(footerStream, CompressionLevel.Optimal);
 #else
-            using (GZipStream gzs = new(footerStream, CompressionLevel.Optimal))
+            using GZipStream gzStream = new(footerStream, CompressionMode.Compress);
 #endif
             {
                 // Start reading data from after last file (PS3UPDAT.PUP)
@@ -849,7 +853,7 @@ namespace LibIRD
                 while (numBytes != 0)
                 {
                     numBytes = fs.Read(buf, 0, buf.Length);
-                    gzs.Write(buf, 0, numBytes);
+                    gzStream.Write(buf, 0, numBytes);
                 }
             }
 
@@ -1038,7 +1042,7 @@ namespace LibIRD
         {
             // Initialise CRC32 ISO hasher, only used if making redump-style IRD
             byte[] crc32;
-            Crc32 isoHasher = new();
+            HashWrapper isoHasher = new(HashType.CRC32);
 
             // Initialise MD5 region hashes
             List<int> regions = [];
@@ -1077,7 +1081,7 @@ namespace LibIRD
                     // If making redump-style IRD, save CRC32 hash to UID field
                     if (redump)
                     {
-                        crc32 = isoHasher.GetCurrentHash();
+                        crc32 = isoHasher.CurrentHashBytes;
                         UID = BitConverter.ToUInt32(crc32, 0);
                     }
                     return;
@@ -1109,7 +1113,7 @@ namespace LibIRD
 
                 // Hash ISO
                 if (redump)
-                    isoHasher.Append(new ReadOnlySpan<byte>(buf, 0, numBytes));
+                    isoHasher.Process(buf, 0, numBytes);
 
                 // Hash regions
                 List<int> regionsEnded = [];
@@ -1241,112 +1245,112 @@ namespace LibIRD
             // Create new stream to uncompressed IRD contents
             using MemoryStream stream = new();
 
-            // Write IRD data to stream in order
-            using (BinaryWriter bw = new(stream, Encoding.UTF8, true))
+            // Write IRD data to stream as UTF8
+            using BinaryWriter bw = new(stream, Encoding.UTF8);
+
+            // IRD File Signature
+            bw.Write(Magic);
+
+            // IRD File Version
+            bw.Write(Version);
+
+            // PARAM.SFO / TITLE_ID
+            byte[] titleIDBuf = Encoding.ASCII.GetBytes(TitleID);
+            bw.Write(titleIDBuf, 0, 9);
+
+            // PARAM.SFO / TITLE
+            bw.Write(Title);
+
+            // PARAM.SFO / PS3_SYSTEM_VER
+            byte[] systemVersionBuf = Encoding.ASCII.GetBytes(SystemVersion);
+            bw.Write(systemVersionBuf, 0, 4);
+
+            // PARAM.SFO / VERSION
+            byte[] buf = Encoding.ASCII.GetBytes(DiscVersion);
+            byte[] discVersionBuf = new byte[5];
+            Array.Copy(buf, 0, discVersionBuf, 0, buf.Length);
+            bw.Write(discVersionBuf, 0, 5);
+
+            // PARAM.SFO / APP_VER
+            buf = Encoding.ASCII.GetBytes(AppVersion);
+            byte[] appVersionBuf = new byte[5];
+            Array.Copy(buf, 0, appVersionBuf, 0, buf.Length);
+            bw.Write(appVersionBuf, 0, 5);
+
+            // IRD Unique Identifier, for version 7
+            if (_version == 7)
+                bw.Write(UID);
+
+            // Compress Header
+            bw.Write(HeaderLength);
+            bw.Write(Header, 0, (int)HeaderLength);
+
+            // Compress Footer
+            bw.Write(FooterLength);
+            bw.Write(Footer, 0, (int)FooterLength);
+
+            // Number of regions hashed
+            bw.Write(RegionCount);
+
+            // Hashes for each region
+            for (int i = 0; i < RegionCount; i++)
             {
-                // IRD File Signature
-                bw.Write(Magic);
-
-                // IRD File Version
-                bw.Write(Version);
-
-                // PARAM.SFO / TITLE_ID
-                byte[] titleIDBuf = Encoding.ASCII.GetBytes(TitleID);
-                bw.Write(titleIDBuf, 0, 9);
-
-                // PARAM.SFO / TITLE
-                bw.Write(Title);
-
-                // PARAM.SFO / PS3_SYSTEM_VER
-                byte[] systemVersionBuf = Encoding.ASCII.GetBytes(SystemVersion);
-                bw.Write(systemVersionBuf, 0, 4);
-
-                // PARAM.SFO / VERSION
-                byte[] buf = Encoding.ASCII.GetBytes(DiscVersion);
-                byte[] discVersionBuf = new byte[5];
-                Array.Copy(buf, 0, discVersionBuf, 0, buf.Length);
-                bw.Write(discVersionBuf, 0, 5);
-
-                // PARAM.SFO / APP_VER
-                buf = Encoding.ASCII.GetBytes(AppVersion);
-                byte[] appVersionBuf = new byte[5];
-                Array.Copy(buf, 0, appVersionBuf, 0, buf.Length);
-                bw.Write(appVersionBuf, 0, 5);
-
-                // IRD Unique Identifier, for version 7
-                if (_version == 7)
-                    bw.Write(UID);
-
-                // Compress Header
-                bw.Write(HeaderLength);
-                bw.Write(Header, 0, (int)HeaderLength);
-
-                // Compress Footer
-                bw.Write(FooterLength);
-                bw.Write(Footer, 0, (int)FooterLength);
-
-                // Number of regions hashed
-                bw.Write(RegionCount);
-
-                // Hashes for each region
-                for (int i = 0; i < RegionCount; i++)
-                {
-                    if (RegionHashes[i] == null)
-                        bw.Write(NullMD5);
-                    else
-                        bw.Write(RegionHashes[i], 0, 16);
-                }
-
-                // Number of files hashed
-                bw.Write(FileCount);
-
-                // Hashes for each file
-                for (int i = 0; i < FileCount; i++)
-                {
-                    bw.Write(FileKeys[i]);
-                    if (FileHashes[i] == null)
-                        bw.Write(NullMD5);
-                    else
-                        bw.Write(FileHashes[i], 0, 16);
-                }
-
-                // Reserved fields
-                bw.Write(ExtraConfig);
-                bw.Write(Attachments);
-
-                // PIC data is placed here for Version 9
-                if (_version >= 9)
-                    bw.Write(PIC, 0, 115);
-
-                // Disc Authentication keys
-                bw.Write(Data1Key, 0, 16);
-                bw.Write(Data2Key, 0, 16);
-
-                // PIC data is placed here prior to Version 9
-                if (_version < 9)
-                    bw.Write(PIC, 0, 115);
-
-                // IRD Unique Identifier, for versions after 7
-                if (_version > 7)
-                    bw.Write(UID);
+                if (RegionHashes[i] == null)
+                    bw.Write(NullMD5);
+                else
+                    bw.Write(RegionHashes[i], 0, 16);
             }
+
+            // Number of files hashed
+            bw.Write(FileCount);
+
+            // Hashes for each file
+            for (int i = 0; i < FileCount; i++)
+            {
+                bw.Write(FileKeys[i]);
+                if (FileHashes[i] == null)
+                    bw.Write(NullMD5);
+                else
+                    bw.Write(FileHashes[i], 0, 16);
+            }
+
+            // Reserved fields
+            bw.Write(ExtraConfig);
+            bw.Write(Attachments);
+
+            // PIC data is placed here for Version 9
+            if (_version >= 9)
+                bw.Write(PIC, 0, 115);
+
+            // Disc Authentication keys
+            bw.Write(Data1Key, 0, 16);
+            bw.Write(Data2Key, 0, 16);
+
+            // PIC data is placed here prior to Version 9
+            if (_version < 9)
+                bw.Write(PIC, 0, 115);
+
+            // IRD Unique Identifier, for versions after 7
+            if (_version > 7)
+                bw.Write(UID);
 
             // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the IRD contents so far
             stream.Position = 0;
-            Crc32 crc32 = new();
-            crc32.Append(stream);
-            byte[] crc = crc32.GetCurrentHash();
+            string crc32String = HashTool.GetStreamHash(stream, HashType.CRC32);
+            byte[] crc32 = HexStringToByteArray(crc32String);
 
             // Write final CRC value to the stream
-            stream.Write(crc, 0, 4);
+            stream.Write(crc32, 0, 4);
 
             // Create the IRD file stream
             using FileStream fs = new(irdPath, FileMode.Create, FileAccess.Write);
             // Create a GZipped IRD file stream
 #if NET6_0_OR_GREATER
             using GZipStream gzStream = new(fs, CompressionLevel.SmallestSize);
-#else
+#elif NETCOREAPP || NET45_OR_GREATER
             using GZipStream gzStream = new(fs, CompressionLevel.Optimal);
+#else
+            using GZipStream gzStream = new(fs, CompressionMode.Compress);
 #endif
             // Write entire gzipped IRD stream to file
             stream.Position = 0;
@@ -1374,7 +1378,7 @@ namespace LibIRD
 
             // Check for IRD file signature
             byte[] magic = br.ReadBytes(4);
-            if (!((ReadOnlySpan<byte>)Magic).SequenceEqual(magic))
+            if (magic == null || magic.Length != 4 || magic[0] != Magic[0] || magic[1] != Magic[1] || magic[2] != Magic[2] || magic[3] != Magic[3])
                 throw new InvalidDataException("IRD file not recognised");
 
             // Read file version
