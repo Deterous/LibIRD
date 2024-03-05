@@ -15,11 +15,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Core", "DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj", "{9E71F5CD-887D-4A61-8460-9F7E8F110B46}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Core", "LibIRD\DiscUtils\Library\DiscUtils.Core\DiscUtils.Core.csproj", "{9E71F5CD-887D-4A61-8460-9F7E8F110B46}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Iso9660", "DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj", "{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Iso9660", "LibIRD\DiscUtils\Library\DiscUtils.Iso9660\DiscUtils.Iso9660.csproj", "{9E1EF05F-388B-42C6-A4E7-98BE20C7C8EC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Streams", "DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj", "{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscUtils.Streams", "LibIRD\DiscUtils\Library\DiscUtils.Streams\DiscUtils.Streams.csproj", "{E8D0B8B0-F165-4FA1-AC7B-194F5F48A5F9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
