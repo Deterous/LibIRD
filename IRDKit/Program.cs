@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 using CommandLine;
@@ -954,19 +953,13 @@ namespace IRDKit
             else if (ids.Count > 1)
             {
                 // More than one result for the CRC32 hash, compute SHA1 hash instead
-                byte[] sha1;
-                using (FileStream fs = File.OpenRead(isoPath))
-                {
-                    SHA1 hasher = SHA1.Create();
-                    sha1 = hasher.ComputeHash(fs);
-                }
-                string sha1_hash = LibIRD.IRD.ByteArrayToHexString(sha1).ToLower();
+                string sha1String = HashTool.GetFileHash(isoPath, HashType.SHA1);
 
                 // Search redump.org for SHA1 hash
 #if !NETFRAMEWORK
-                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1_hash).ConfigureAwait(false).GetAwaiter().GetResult();
+                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1String).ConfigureAwait(false).GetAwaiter().GetResult();
 #else
-                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1_hash);
+                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1String);
 #endif
                 if (ids2.Count == 0)
                 {
@@ -1044,9 +1037,7 @@ namespace IRDKit
             if (ird.ExtraConfig != 0x0001)
                 throw new ArgumentException($"{irdPath} is not a redump-style IRD");
 
-            string filename = GetDatFilename(ird, datfile);
-            if (filename == null)
-                throw new ArgumentException($"Cannot determine DAT filename for {irdPath}");
+            string filename = GetDatFilename(ird, datfile) ?? throw new ArgumentException($"Cannot determine DAT filename for {irdPath}");
             if (serial)
                 filename += $" [{ird.TitleID.Substring(0, 4)}-{ird.TitleID.Substring(5, 5)}]";
             if (crc)

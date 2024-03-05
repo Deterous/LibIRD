@@ -758,7 +758,8 @@ namespace LibIRD
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
             UpdateOffset = SectorSize * updateClusters[0].Offset;
             // Update file ends at the last byte of the last cluster
-            UpdateEnd = SectorSize * updateClusters[updateClusters.Length - 1].Offset + updateClusters[updateClusters.Length - 1].Count;
+            int lastExtent = updateClusters.Length - 1;
+            UpdateEnd = SectorSize * updateClusters[lastExtent].Offset + updateClusters[lastExtent].Count;
 
             // Check PUP file Magic
             fs.Seek(UpdateOffset, SeekOrigin.Begin);
@@ -905,7 +906,8 @@ namespace LibIRD
             // Remove header from first region
             RegionStart[0] = FirstDataSector;
             // Remove footer from last region
-            RegionEnd[RegionEnd.Length - 1] = (UpdateEnd / SectorSize) - 1;
+            int lastRegion = RegionEnd.Length - 1;
+            RegionEnd[lastRegion] = (UpdateEnd / SectorSize) - 1;
         }
 
         /// <summary>
@@ -1210,7 +1212,8 @@ namespace LibIRD
                     }
 
                     // Check if current file has ended in this buffer (assumes last extent contains last byte)
-                    long lastByte = SectorSize * FileExtents[i][FileExtents[i].Length - 1].Offset + FileExtents[i][FileExtents[i].Length - 1].Count;
+                    int lastExtent = FileExtents[i].Length - 1;
+                    long lastByte = SectorSize * FileExtents[i][lastExtent].Offset + FileExtents[i][lastExtent].Count;
                     if (lastByte < SectorSize * (currentSector + bufSectors)
                         && lastByte > SectorSize * currentSector)
                     {

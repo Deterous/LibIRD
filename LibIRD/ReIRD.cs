@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using SabreTools.Hashing;
 
 namespace LibIRD
 {
@@ -229,34 +228,6 @@ namespace LibIRD
             }
 
             return pic;
-        }
-
-        /// <summary>
-        /// Generates the UID field by computing the CRC32 hash of the ISO
-        /// </summary>
-        /// <param name="isoPath">Path to the ISO</param>
-        /// <exception cref="FileNotFoundException"></exception>
-        private static uint GenerateUID(string isoPath)
-        {
-            // Check file exists
-            FileInfo iso;
-            try
-            {
-                iso = new FileInfo(isoPath);
-            }
-            catch (Exception e)
-            {
-                throw new ArgumentException("Invalid ISO Path: " + e.Message);
-            }
-            if (!iso.Exists)
-                throw new FileNotFoundException(nameof(isoPath));
-
-            // Compute CRC32 hash
-            string crc32String = HashTool.GetFileHash(isoPath, HashType.CRC32); // TODO: Output byte[] once ST.Hashing supports it
-            byte[] crc32 = HexStringToByteArray(crc32String);
-
-            // Redump ISO CRC32 hash is used as the Unique ID in the reproducible IRD
-            return BitConverter.ToUInt32(crc32, 0);
         }
 
         /// <summary>
