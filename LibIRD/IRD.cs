@@ -558,7 +558,7 @@ namespace LibIRD
             if (line == null)
                 throw new InvalidDataException("Could not find Disc Key in .getkey.log");
             // Get Disc Key from log
-            string discKeyStr = line["disc_key = ".Length..];
+            string discKeyStr = line.Substring("disc_key = ".Length);
             // Validate Disc Key from log
             if (discKeyStr.Length != 32)
                 throw new InvalidDataException("Unexpected Disc Key in .getkey.log");
@@ -571,12 +571,12 @@ namespace LibIRD
             if (line == null)
                 throw new InvalidDataException("Could not find Disc ID in .getkey.log");
             // Get Disc ID from log
-            string discIDStr = line["disc_id = ".Length..];
+            string discIDStr = line.Substring("disc_id = ".Length);
             // Validate Disc ID from log
             if (discIDStr.Length != 32)
                 throw new InvalidDataException("Unexpected Disc ID in .getkey.log");
             // Replace X's in Disc ID with 00000001
-            discIDStr = discIDStr[..24] + "00000001";
+            discIDStr = discIDStr.Substring(0, 24) + "00000001";
             // Convert Disc ID to byte array
             discID = HexStringToByteArray(discIDStr);
 
@@ -593,7 +593,7 @@ namespace LibIRD
             if (discPICStr.Length != 256)
                 throw new InvalidDataException("Unexpected PIC in .getkey.log");
             // Convert PIC to byte array
-            discPIC = HexStringToByteArray(discPICStr[..230]);
+            discPIC = HexStringToByteArray(discPICStr.Substring(0, 230));
 
             // Double check for warnings in .getkey.log
             while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
@@ -645,7 +645,7 @@ namespace LibIRD
                 bool titleIDFound = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string titleID);
                 // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
                 if (titleIDFound && titleID.Length == 10 && titleID[4] == '-')
-                    TitleID = string.Concat(titleID.AsSpan(0, 4), titleID.AsSpan(5, 5));
+                    TitleID = titleID.Substring(0, 4) + titleID.Substring(5, 5);
 
                 // If the version field is present, this is a multi-game disc
                 // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
@@ -665,7 +665,7 @@ namespace LibIRD
                 {
                     bool titleIDFound = paramSFO.Field.TryGetValue("TITLE_ID", out string titleID);
                     if (titleIDFound)
-                        TitleID = titleID.Length == 9 ? titleID : titleID.PadRight(9, '\0')[..9];
+                        TitleID = titleID.Length == 9 ? titleID : titleID.PadRight(9, '\0').Substring(0, 9);
                     else
                         TitleID = "\0\0\0\0\0\0\0\0\0";
                 }
@@ -679,7 +679,7 @@ namespace LibIRD
                 {
                     bool discVersionFound = paramSFO.Field.TryGetValue("VERSION", out string discVersion);
                     if (discVersionFound)
-                        DiscVersion = discVersion.Length == 5 ? discVersion : discVersion.PadRight(5, '\0')[..5];
+                        DiscVersion = discVersion.Length == 5 ? discVersion : discVersion.PadRight(5, '\0').Substring(0, 5);
                     else
                         DiscVersion = "\0\0\0\0\0";
                 }
@@ -687,7 +687,7 @@ namespace LibIRD
                 // Try use App Version from PARAM.SFO 
                 bool appVersionFound = paramSFO.Field.TryGetValue("APP_VER", out string appVersion);
                 if (appVersionFound)
-                    AppVersion = appVersion.Length == 5 ? appVersion : appVersion.PadRight(5, '\0')[..5];
+                    AppVersion = appVersion.Length == 5 ? appVersion : appVersion.PadRight(5, '\0').Substring(0, 5);
                 else
                     AppVersion = "\0\0\0\0\0";
             }
@@ -758,7 +758,7 @@ namespace LibIRD
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
             UpdateOffset = SectorSize * updateClusters[0].Offset;
             // Update file ends at the last byte of the last cluster
-            UpdateEnd = SectorSize * updateClusters[^1].Offset + updateClusters[^1].Count;
+            UpdateEnd = SectorSize * updateClusters[updateClusters.Length - 1].Offset + updateClusters[updateClusters.Length - 1].Count;
 
             // Check PUP file Magic
             fs.Seek(UpdateOffset, SeekOrigin.Begin);
@@ -886,22 +886,22 @@ namespace LibIRD
             {
                 // End sector of previous region is start of this region
                 if (i % 2 == 1)
-                    RegionStart[i] = BitConverter.ToInt32(regionSector) + 1;
+                    RegionStart[i] = BitConverter.ToInt32(regionSector, 0) + 1;
                 else
-                    RegionStart[i] = BitConverter.ToInt32(regionSector);
+                    RegionStart[i] = BitConverter.ToInt32(regionSector, 0);
                 // Determine end sector offset of this region
                 fs.Read(regionSector, 0, 4);
                 Array.Reverse(regionSector, 0, 4);
                 if (i % 2 == 1)
-                    RegionEnd[i] = BitConverter.ToInt32(regionSector) - 1;
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector, 0) - 1;
                 else
-                    RegionEnd[i] = BitConverter.ToInt32(regionSector);
+                    RegionEnd[i] = BitConverter.ToInt32(regionSector, 0);
             }
 
             // Remove header from first region
             RegionStart[0] = FirstDataSector;
             // Remove footer from last region
-            RegionEnd[^1] = (UpdateEnd / SectorSize) - 1;
+            RegionEnd[RegionEnd.Length - 1] = (UpdateEnd / SectorSize) - 1;
         }
 
         /// <summary>
@@ -1205,7 +1205,7 @@ namespace LibIRD
                     }
 
                     // Check if current file has ended in this buffer (assumes last extent contains last byte)
-                    long lastByte = SectorSize * FileExtents[i][^1].Offset + FileExtents[i][^1].Count;
+                    long lastByte = SectorSize * FileExtents[i][FileExtents[i].Length - 1].Offset + FileExtents[i][FileExtents[i].Length - 1].Count;
                     if (lastByte < SectorSize * (currentSector + bufSectors)
                         && lastByte > SectorSize * currentSector)
                     {

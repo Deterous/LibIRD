@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace LibIRD
 {
@@ -155,18 +155,13 @@ namespace LibIRD
         }
 
         /// <summary>
-        /// Define JSON options once
-        /// </summary>
-        private readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
-
-        /// <summary>
         /// Prints parameters extracted from PARAM.SFO to a json object
         /// </summary>
         /// <param name="jsonPath">Optionally print to json file</param>
         public void PrintJson(string jsonPath = null)
         {
             // Serialise PS3_Disc.SFB data to a JSON object
-            string json = JsonSerializer.Serialize(Field, JsonOpts);
+            string json = JsonConvert.SerializeObject(Field, Formatting.Indented);
 
             // If no path given, output to console
             if (jsonPath == null)
