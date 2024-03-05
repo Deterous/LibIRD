@@ -1,13 +1,13 @@
-﻿using DiscUtils;
-using DiscUtils.Iso9660;
-using DiscUtils.Streams;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
 using System.Security.Cryptography;
 using System.Text;
+using LibIRD.DiscUtils;
+using LibIRD.DiscUtils.Iso9660;
+using LibIRD.DiscUtils.Streams;
 
 namespace LibIRD
 {
@@ -540,11 +540,11 @@ namespace LibIRD
         private protected void ParseGetKeyLog(string getKeyLog)
         {
             // Validate .getkey.log file path
-            if (!File.Exists(getKeyLog))
+            if (!System.IO.File.Exists(getKeyLog))
                 throw new FileNotFoundException(nameof(getKeyLog));
 
             // Read from .getkey.log file
-            using StreamReader sr = File.OpenText(getKeyLog);
+            using StreamReader sr = System.IO.File.OpenText(getKeyLog);
 
             // Determine whether GetKey was successful
             string line;
@@ -1363,7 +1363,7 @@ namespace LibIRD
             // Validate irdPath
             if (irdPath == null || irdPath.Length <= 0)
                 throw new ArgumentNullException(nameof(irdPath));
-            if (!File.Exists(irdPath))
+            if (!System.IO.File.Exists(irdPath))
                 throw new FileNotFoundException(nameof(irdPath));
 
             // Open IRD for reading
@@ -1507,7 +1507,7 @@ namespace LibIRD
             }
             else
             {
-                File.AppendAllText(printPath, printText.ToString());
+                System.IO.File.AppendAllText(printPath, printText.ToString());
             }
         }
 
@@ -1557,7 +1557,7 @@ namespace LibIRD
             else
             {
                 // Write to path
-                File.AppendAllText(jsonPath, json.ToString());
+                System.IO.File.AppendAllText(jsonPath, json.ToString());
             }
         }
 

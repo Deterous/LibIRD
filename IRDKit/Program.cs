@@ -1,9 +1,4 @@
-﻿using CommandLine;
-using DiscUtils;
-using DiscUtils.Iso9660;
-using LibIRD;
-using SabreTools.RedumpLib.Web;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -12,6 +7,9 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
+using CommandLine;
+using LibIRD;
+using SabreTools.RedumpLib.Web;
 
 namespace IRDKit
 {
@@ -295,7 +293,7 @@ namespace IRDKit
                                 {
                                     PrintISO(file, opt.Json, file.Equals(lastISO), opt.OutPath);
                                 }
-                                catch (InvalidFileSystemException)
+                                catch (LibIRD.DiscUtils.InvalidFileSystemException)
                                 {
                                     // Not a valid ISO file despite extension, assume file is an IRD
                                     if (!opt.Json)
@@ -476,7 +474,7 @@ namespace IRDKit
                     PrintISO(inPath, json, single, outPath);
                     return;
                 }
-                catch (InvalidFileSystemException)
+                catch (LibIRD.DiscUtils.InvalidFileSystemException)
                 {
                     // Not a valid ISO file despite extension, try open as IRD
                 }
@@ -526,18 +524,18 @@ namespace IRDKit
             // Open ISO file for reading
             using FileStream fs = new(isoPath, FileMode.Open, FileAccess.Read);
             // Validate ISO file stream
-            if (fs == null || !CDReader.Detect(fs))
+            if (fs == null || !LibIRD.DiscUtils.Iso9660.CDReader.Detect(fs))
             {
                 Console.Error.WriteLine($"{isoPath} is not a valid ISO file");
                 return;
             }
             // Create new ISO reader
-            using CDReader reader = new(fs, true, true);
+            using LibIRD.DiscUtils.Iso9660.CDReader reader = new(fs, true, true);
 
             // Write PS3_DISC.SFB info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+                using LibIRD.DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
                 PS3_DiscSFB ps3_DiscSFB = new(s);
                 if (json)
                 {
@@ -574,7 +572,7 @@ namespace IRDKit
             // Write PARAM.SFO info
             try
             {
-                using DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
+                using LibIRD.DiscUtils.Streams.SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
                 ParamSFO paramSFO = new(s);
                 if (json)
                 {
