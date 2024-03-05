@@ -1046,20 +1046,20 @@ namespace LibIRD
 
             // Initialise MD5 region hashes
             List<int> regions = [];
-            MD5[] regionMD5 = new MD5[RegionCount];
+            HashWrapper[] regionMD5 = new HashWrapper[RegionCount];
             for (int i = 0; i < RegionCount; i++)
             {
                 regions.Add(i);
-                regionMD5[i] = MD5.Create();
+                regionMD5[i] = new(HashType.MD5);
             }
 
             // Initialise MD5 file hashes
             List<int> files = [];
-            MD5[] fileMD5 = new MD5[FileCount];
+            HashWrapper[] fileMD5 = new HashWrapper[FileCount];
             for (int i = 0; i < FileCount; i++)
             {
                 files.Add(i);
-                fileMD5[i] = MD5.Create();
+                fileMD5[i] = new(HashType.MD5);
             }
 
             // Start hashing from beginning of ISO
@@ -1135,23 +1135,24 @@ namespace LibIRD
                         // Determine end byte
                         int endByte = (int)(SectorSize * (RegionEnd[i] - currentSector + 1));
                         // Close region hash
-                        regionMD5[i].TransformFinalBlock(buf, startByte, endByte - startByte);
-                        RegionHashes[i] = regionMD5[i].Hash;
-                        regionMD5[i].Clear();
+                        regionMD5[i].Process(buf, startByte, endByte - startByte);
+                        regionMD5[i].Terminate();
+                        RegionHashes[i] = regionMD5[i].CurrentHashBytes;
+                        regionMD5[i].Dispose();
                         regionsEnded.Add(i);
                     }
                     // Check if region has already begun
                     else if (RegionStart[i] <= currentSector)
                     {
                         // Hash buffer
-                        regionMD5[i].TransformBlock(buf, 0, (int)SectorSize * bufSectors, null, 0);
+                        regionMD5[i].Process(buf, 0, (int)SectorSize * bufSectors);
                     }
                     // Region Start is in this buffer, ending is in the future
                     else
                     {
                         // Hash partial buffer
                         int regionStart = (int)(SectorSize * (RegionStart[i] - currentSector));
-                        regionMD5[i].TransformBlock(buf, regionStart, (int)SectorSize * bufSectors - regionStart, null, 0);
+                        regionMD5[i].Process(buf, regionStart, (int)SectorSize * bufSectors - regionStart);
                     }
                 }
                 if (regionsEnded.Count > 0)
@@ -1205,7 +1206,7 @@ namespace LibIRD
                         // Don't hash more than the buffer size
                         endByte = endByte < bufSectors * (int)SectorSize ? endByte : bufSectors * (int)SectorSize;
                         // Hash portion of buffer that file exists in
-                        fileMD5[i].TransformBlock(buf, startByte, endByte - startByte, null, 0);
+                        fileMD5[i].Process(buf, startByte, endByte - startByte);
                     }
 
                     // Check if current file has ended in this buffer (assumes last extent contains last byte)
@@ -1214,9 +1215,9 @@ namespace LibIRD
                         && lastByte > SectorSize * currentSector)
                     {
                         // Close file hash
-                        fileMD5[i].TransformFinalBlock(buf, 0, 0);
-                        FileHashes[i] = fileMD5[i].Hash;
-                        fileMD5[i].Clear();
+                        fileMD5[i].Terminate();
+                        FileHashes[i] = fileMD5[i].CurrentHashBytes;
+                        fileMD5[i].Dispose();
                         filesEnded.Add(i);
                     }
                 }
