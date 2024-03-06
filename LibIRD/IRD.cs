@@ -804,11 +804,11 @@ namespace LibIRD
             // Begin a GZip stream to write header to
             using MemoryStream headerStream = new();
 #if NET6_0_OR_GREATER
-            using GZipStream gzStream = new(headerStream, CompressionLevel.SmallestSize);
+            using (GZipStream gzStream = new(headerStream, CompressionLevel.SmallestSize))
 #elif NETCOREAPP || NET45_OR_GREATER
-            using GZipStream gzStream = new(headerStream, CompressionLevel.Optimal);
+            using (GZipStream gzStream = new(headerStream, CompressionLevel.Optimal))
 #else
-            using GZipStream gzStream = new(headerStream, CompressionMode.Compress);
+            using (GZipStream gzStream = new(headerStream, CompressionMode.Compress))
 #endif
             {
                 // Start reading data from the beginning of the ISO file
@@ -838,11 +838,11 @@ namespace LibIRD
             // Begin a GZip stream to write footer to
             using MemoryStream footerStream = new();
 #if NET6_0_OR_GREATER
-            using GZipStream gzStream = new(footerStream, CompressionLevel.SmallestSize);
+            using (GZipStream gzStream = new(footerStream, CompressionLevel.SmallestSize))
 #elif NETCOREAPP || NET45_OR_GREATER
-            using GZipStream gzStream = new(footerStream, CompressionLevel.Optimal);
+            using (GZipStream gzStream = new(footerStream, CompressionLevel.Optimal))
 #else
-            using GZipStream gzStream = new(footerStream, CompressionMode.Compress);
+            using (GZipStream gzStream = new(footerStream, CompressionMode.Compress))
 #endif
             {
                 // Start reading data from after last file (PS3UPDAT.PUP)
@@ -1084,6 +1084,7 @@ namespace LibIRD
                     if (redump)
                     {
                         crc32 = isoHasher.CurrentHashBytes;
+                        Array.Reverse(crc32);
                         UID = BitConverter.ToUInt32(crc32, 0);
                     }
                     return;
@@ -1340,8 +1341,8 @@ namespace LibIRD
 
             // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the IRD contents so far
             stream.Position = 0;
-            string crc32String = HashTool.GetStreamHash(stream, HashType.CRC32);
-            byte[] crc32 = HexStringToByteArray(crc32String);
+            byte[] crc32 = HashTool.GetStreamHashArray(stream, HashType.CRC32, true);
+            Array.Reverse(crc32);
 
             // Write final CRC value to the stream
             stream.Write(crc32, 0, 4);

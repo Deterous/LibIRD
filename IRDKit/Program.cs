@@ -933,8 +933,12 @@ namespace IRDKit
                 Console.WriteLine("No key provided... Searching for key on redump.org");
 
             // Compute CRC32 hash
-            string crc32String = HashTool.GetFileHash(isoPath, HashType.CRC32); // TODO: Output byte[] once ST.Hashing supports it
-            uint crc32UInt = BitConverter.ToUInt32(LibIRD.IRD.HexStringToByteArray(crc32String), 0);
+            byte[] crc32 = HashTool.GetFileHashArray(isoPath, HashType.CRC32);
+            string crc32String = LibIRD.IRD.ByteArrayToHexString(crc32).ToLowerInvariant();
+
+            // Convert to UInt for use as UID in IRD
+            Array.Reverse(crc32);
+            uint crc32UInt = BitConverter.ToUInt32(crc32, 0);
 
             // Search for ISO on redump.org
 #if !NETFRAMEWORK
