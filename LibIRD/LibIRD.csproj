@@ -26,14 +26,10 @@
   <ItemGroup>
     <None Include="./README.md" Pack="true" PackagePath="" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SabreTools.Hashing" Version="1.1.3" />
-  </ItemGroup>
-  
-  <ItemGroup Condition="$(TargetFramework.StartsWith(`netcoreapp3`)) OR $(TargetFramework.StartsWith(`net5`))">
-    <PackageReference Include="System.Security.AccessControl" Version="6.0.0" />
   </ItemGroup>
 
 </Project>
