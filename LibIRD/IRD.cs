@@ -1056,6 +1056,10 @@ namespace LibIRD
                 CountFiles(dirInfo);
         }
 
+        #endregion
+
+        #region Hashing
+
         /// <summary>
         /// Calculate hashes for all region and file extents
         /// </summary>
@@ -1201,7 +1205,7 @@ namespace LibIRD
 
                         // Don't decrypt last sectors if the encrypted region ends within this buffer
                         if (RegionEnd[i] < currentSector + bufSectors)
-                            encCount -= (int)(currentSector + bufSectors - RegionEnd[i] + 1);
+                            encCount -= (int)(currentSector + bufSectors - RegionEnd[i] - 1);
 
                         // Decrypt encrypted sectors
                         DecryptSectors(ref buf, (int)currentSector + encOffset, encOffset, encCount);
