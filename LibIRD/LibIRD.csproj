@@ -2,13 +2,12 @@
 
   <PropertyGroup>
     <!-- Assembly Properties -->
-    <TargetFrameworks>net462;net472;net48;netcoreapp3.1;net5.0;net6.0;net7.0;net8.0</TargetFrameworks>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-	<CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <LangVersion>latest</LangVersion>
-	<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.7.0</Version>
+    <Version>0.7.1</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
     
     <!-- Package Properties -->
@@ -22,6 +21,14 @@
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
+  
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith(`osx-arm`))">
+    <TargetFrameworks>net6.0;net7.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="!$(RuntimeIdentifier.StartsWith(`osx-arm`))">
+    <TargetFrameworks>net20;net35;net40;net452;net462;net472;net48;netcoreapp3.1;net5.0;net6.0;net7.0;net8.0</TargetFrameworks>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Include="./README.md" Pack="true" PackagePath="" />
@@ -29,7 +36,7 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="SabreTools.Hashing" Version="1.1.3" />
+    <PackageReference Include="SabreTools.Hashing" Version="1.1.4" />
   </ItemGroup>
 
 </Project>

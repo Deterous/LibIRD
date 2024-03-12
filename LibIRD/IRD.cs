@@ -413,7 +413,11 @@ namespace LibIRD
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(key));
 
             // Setup AES decryption
+#if NET35_OR_GREATER || NETCOREAPP
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+#else
+            using Rijndael aes = Rijndael.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings"); ;
+#endif
 
             // Set AES settings
             aes.Key = D1AesKey;
@@ -446,7 +450,11 @@ namespace LibIRD
                 throw new ArgumentException("Disc Key must be a byte array of length 16", nameof(d1));
 
             // Setup AES decryption
+#if NET35_OR_GREATER || NETCOREAPP
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+#else
+            using Rijndael aes = Rijndael.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings"); ;
+#endif
 
             // Set AES settings
             aes.Key = D1AesKey;
@@ -478,7 +486,11 @@ namespace LibIRD
             if (d2.Length != 16) throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
+#if NET35_OR_GREATER || NETCOREAPP
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+#else
+            using Rijndael aes = Rijndael.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings"); ;
+#endif
 
             // Set AES settings
             aes.Key = D2AesKey;
@@ -511,7 +523,11 @@ namespace LibIRD
                 throw new ArgumentException("Disc ID must be a byte array of length 16", nameof(d2));
 
             // Setup AES encryption
+#if NET35_OR_GREATER || NETCOREAPP
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+#else
+            using Rijndael aes = Rijndael.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings"); ;
+#endif
 
             // Set AES settings
             aes.Key = D2AesKey;
@@ -737,7 +753,7 @@ namespace LibIRD
             HashISO(fs, redump && UID == 0x00000000);
         }
 
-        #endregion
+#endregion
 
         #region Reading ISO
 
@@ -989,7 +1005,12 @@ namespace LibIRD
                 throw new ArgumentException("Number of sectors must be within buffer");
 
             // Setup AES decryption
+#if NET35_OR_GREATER || NETCOREAPP
             using Aes aes = Aes.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings");
+#else
+            using Rijndael aes = Rijndael.Create() ?? throw new InvalidOperationException("AES not available. Change your system settings"); ;
+#endif
+
             // Set AES settings
             aes.Key = DiscKey;
             aes.Padding = PaddingMode.None;
@@ -1359,7 +1380,14 @@ namespace LibIRD
 #endif
             // Write entire gzipped IRD stream to file
             stream.Position = 0;
+#if NET40_OR_GREATER || NETCOREAPP
             stream.CopyTo(gzStream);
+#else
+            byte[] buffer = new byte[1024];
+            int numBytes;
+            while ((numBytes = stream.Read(buffer, 0, buffer.Length)) > 0)
+                gzStream.Write(buffer, 0, numBytes);
+#endif
         }
 
         /// <summary>
@@ -1571,7 +1599,7 @@ namespace LibIRD
             }
         }
 
-        #endregion
+#endregion
 
         #region Helper Functions
 
