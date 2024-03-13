@@ -1105,6 +1105,22 @@ namespace LibIRD
                 // If end of ISO reached, stop reading
                 if (numBytes == 0)
                 {
+                    // Ensure all hashes have been saved
+                    foreach (int i in regions)
+                    {
+                        // Close region hash
+                        regionMD5[i].Terminate();
+                        RegionHashes[i] = regionMD5[i].CurrentHashBytes;
+                        regionMD5[i].Dispose();
+                    }
+                    foreach (int i in files)
+                    {
+                        // Close file hash
+                        fileMD5[i].Terminate();
+                        FileHashes[i] = fileMD5[i].CurrentHashBytes;
+                        fileMD5[i].Dispose();
+                    }
+
                     // If making redump-style IRD, save CRC32 hash to UID field
                     if (redump)
                     {
@@ -1112,6 +1128,7 @@ namespace LibIRD
                         Array.Reverse(crc32);
                         UID = BitConverter.ToUInt32(crc32, 0);
                     }
+
                     return;
                 }
 
@@ -1240,7 +1257,7 @@ namespace LibIRD
                     // Check if current file has ended in this buffer (assumes last extent contains last byte)
                     int lastExtent = FileExtents[i].Length - 1;
                     long lastByte = SectorSize * FileExtents[i][lastExtent].Offset + FileExtents[i][lastExtent].Count;
-                    if (lastByte < SectorSize * (currentSector + bufSectors)
+                    if (lastByte <= SectorSize * (currentSector + bufSectors)
                         && lastByte > SectorSize * currentSector)
                     {
                         // Close file hash
