@@ -97,6 +97,9 @@ namespace IRDKit
             [Option('s', "serial", HelpText = "Appends disc serial to new IRD filename")]
             public bool Serial { get; set; }
 
+            [Option('e', "version", HelpText = "Appends disc version to new IRD filename")]
+            public bool Ver { get; set; }
+
             [Option('c', "crc", HelpText = "Appends ISO CRC to new IRD filename")]
             public bool CRC { get; set; }
 
@@ -414,7 +417,7 @@ namespace IRDKit
                             {
                                 try
                                 {
-                                    RenameIRD(file, datfile, serial: opt.Serial, crc: opt.CRC, verbose: opt.Verbose);
+                                    RenameIRD(file, datfile, serial: opt.Serial, ver: opt.Ver, crc: opt.CRC, verbose: opt.Verbose);
                                 }
                                 catch (Exception e)
                                 {
@@ -435,7 +438,7 @@ namespace IRDKit
                             // Rename provided IRD path
                             try
                             {
-                                RenameIRD(irdPath, datfile, serial: opt.Serial, crc: opt.CRC, verbose: opt.Verbose);
+                                RenameIRD(irdPath, datfile, serial: opt.Serial, ver: opt.Ver, crc: opt.CRC, verbose: opt.Verbose);
                             }
                             catch (Exception e)
                             {
@@ -1034,7 +1037,7 @@ namespace IRDKit
             return node.Attribute("name").Value;
         }
 
-        public static void RenameIRD(string irdPath, XDocument datfile, bool serial = false, bool crc = false, bool verbose = false)
+        public static void RenameIRD(string irdPath, XDocument datfile, bool serial = false, bool ver = false, bool crc = false, bool verbose = false)
         {
             IRD ird = IRD.Read(irdPath);
 
@@ -1043,7 +1046,9 @@ namespace IRDKit
 
             string filename = GetDatFilename(ird, datfile) ?? throw new ArgumentException($"Cannot determine DAT filename for {irdPath}");
             if (serial)
-                filename += $" [{ird.TitleID.Substring(0, 4)}-{ird.TitleID.Substring(5, 5)}]";
+                filename += $" [{ird.TitleID.Substring(0, 4).Replace('\0', ' ')}-{ird.TitleID.Substring(4, 5).Replace('\0', ' ')}]";
+            if (ver)
+                filename += $" [{ird.DiscVersion.Replace('\0', ' ')}]";
             if (crc)
                 filename += $" [{ird.UID:X8}]";
 

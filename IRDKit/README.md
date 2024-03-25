@@ -39,3 +39,9 @@ For all options, run `irdkit help diff`
 
 To compare two IRDs, run `irdkit diff game1.ird game2.ird`
 The comparison can be printed to a file, e.g. `-o out.txt` or `--output=`
+
+## Renaming IRDs
+
+For all options, run `irdkit help rename`
+
+To rename an IRD (or folder of IRDs) according to a redump DAT, run `irdkit rename -d redump.dat game.ird`
