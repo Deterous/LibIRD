@@ -281,11 +281,6 @@ namespace LibIRD
         private long FirstDataSector { get; set; }
 
         /// <summary>
-        /// First byte of the PS3UPDAT.PUP file
-        /// </summary>
-        private long UpdateOffset { get; set; }
-
-        /// <summary>
         /// Last byte of the PS3UPDAT.PUP file
         /// </summary>
         /// <remarks>Offset to use when reading the footer</remarks>
@@ -652,27 +647,35 @@ namespace LibIRD
                 // Redump-style IRDs set the lowest bit of ExtraConfig to 1
                 ExtraConfig |= 0x01;
 
-                // Redump-style IRDs use fields from PS3_DISC.SFB
-                using SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
+                // Try to get Title ID and Disc Version from PS3_DISC.SFB
+                try
+                {
+                    // Redump-style IRDs use fields from PS3_DISC.SFB
+                    using SparseStream s = reader.OpenFile("PS3_DISC.SFB", FileMode.Open, FileAccess.Read);
 
-                // Parse PS3_DISC.SFB file
-                PS3_DiscSFB ps3_DiscSFB = new(s);
+                    // Parse PS3_DISC.SFB file
+                    PS3_DiscSFB ps3_DiscSFB = new(s);
 
-                bool titleIDFound = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string titleID);
-                // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
-                if (titleIDFound && titleID.Length == 10 && titleID[4] == '-')
-                    TitleID = titleID.Substring(0, 4) + titleID.Substring(5, 5);
+                    bool titleIDFound = ps3_DiscSFB.Field.TryGetValue("TITLE_ID", out string titleID);
+                    // If a valid TITLE_ID field is present, remove the hyphen to fit into standard IRD file
+                    if (titleIDFound && titleID.Length == 10 && titleID[4] == '-')
+                        TitleID = titleID.Substring(0, 4) + titleID.Substring(5, 5);
 
-                // If the version field is present, this is a multi-game disc
-                // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
-                bool discVersionFound = ps3_DiscSFB.Field.TryGetValue("VERSION", out string discVersion);
-                if (discVersionFound)
-                    DiscVersion = discVersion;
+                    // If the version field is present, this is a multi-game disc
+                    // Redump-style IRDs use the VERSION field from PS3_DISC.SFB instead of VERSION from PARAM.SFO
+                    bool discVersionFound = ps3_DiscSFB.Field.TryGetValue("VERSION", out string discVersion);
+                    if (discVersionFound)
+                        DiscVersion = discVersion;
+                }
+                catch { }
             }
 
-            // Read PS3 Metadata from PARAM.SFO
-            using (SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read))
+            // Try to get Title ID, Title, Disc Version, and App Version from PARAM.SFO
+            try
             {
+                // Read PS3 Metadata from PARAM.SFO
+                using SparseStream s = reader.OpenFile("\\PS3_GAME\\PARAM.SFO", FileMode.Open, FileAccess.Read);
+
                 // Parse PARAM.SFO file
                 ParamSFO paramSFO = new(s);
 
@@ -707,18 +710,33 @@ namespace LibIRD
                 else
                     AppVersion = "\0\0\0\0\0";
             }
+            catch { }
 
-            // Determine system update version
-            GetSystemVersion(fs, reader);
+            // Ensure Title ID is set and valid
+            if (string.IsNullOrEmpty(TitleID) || TitleID.Length != 9)
+                TitleID = "\0\0\0\0\0\0\0\0\0";
 
-            // Read and compress the ISO header
-            GetHeader(fs, reader);
+            // Ensure Title is set
+            Title ??= string.Empty;
 
-            // Read and compress the ISO footer
-            GetFooter(fs);
+            // Ensure Disc Version is set and valid
+            if (string.IsNullOrEmpty(DiscVersion) || DiscVersion.Length != 5)
+                DiscVersion = "\0\0\0\0\0";
 
-            // Get info region info from ISO
-            GetRegions(fs);
+            // Ensure App Version is set and valid
+            if (string.IsNullOrEmpty(AppVersion) || AppVersion.Length != 5)
+                AppVersion = "\0\0\0\0\0";
+
+            // Try determine system update version
+            try
+            {
+                GetSystemVersion(fs, reader);
+            }
+            catch { }
+
+            // Ensure System Version was set and valid
+            if (string.IsNullOrEmpty(SystemVersion) || SystemVersion.Length != 4)
+                SystemVersion = "\0\0\0\0";
 
             // Recursively count all files in ISO to allocate file arrays
             DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
@@ -747,6 +765,23 @@ namespace LibIRD
             // Sort files by offset
             Array.Sort(FileKeys, FileExtents);
 
+            // Determine start of footer if no update file present
+            if (UpdateEnd == 0)
+            {
+                int lastFile = FileExtents.Length - 1;
+                int lastExtent = FileExtents[lastFile].Length - 1;
+                UpdateEnd = SectorSize * FileExtents[lastFile][lastExtent].Offset + FileExtents[lastFile][lastExtent].Count;
+            }
+
+            // Read and compress the ISO header
+            GetHeader(fs, reader);
+
+            // Read and compress the ISO footer
+            GetFooter(fs);
+
+            // Get info region info from ISO
+            GetRegions(fs);
+
             // Calculate CRC32 hash of ISO only if generating a redump IRD and the UID is not already set
             RegionHashes = new byte[RegionCount][];
             FileHashes = new byte[FileCount][];
@@ -772,13 +807,13 @@ namespace LibIRD
                 throw new IOException("Invalid file extents for PS3UPDAT.PUP");
 
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
-            UpdateOffset = SectorSize * updateClusters[0].Offset;
+            long updateOffset = SectorSize * updateClusters[0].Offset;
             // Update file ends at the last byte of the last cluster
             int lastExtent = updateClusters.Length - 1;
             UpdateEnd = SectorSize * updateClusters[lastExtent].Offset + updateClusters[lastExtent].Count;
 
             // Check PUP file Magic
-            fs.Seek(UpdateOffset, SeekOrigin.Begin);
+            fs.Seek(updateOffset, SeekOrigin.Begin);
             byte[] pupMagic = new byte[5];
             fs.Read(pupMagic, 0, pupMagic.Length);
             // If magic is incorrect, set version to all nulls, "\0\0\0\0" (unknown)
@@ -787,13 +822,13 @@ namespace LibIRD
             else
             {
                 // Determine location of version string
-                fs.Seek(UpdateOffset + 0x3E, SeekOrigin.Begin);
+                fs.Seek(updateOffset + 0x3E, SeekOrigin.Begin);
                 byte[] offset = new byte[2];
                 fs.Read(offset, 0, 2);
                 // Move stream to PUP version string
                 Array.Reverse(offset);
                 ushort versionOffset = BitConverter.ToUInt16(offset, 0);
-                fs.Seek(UpdateOffset + versionOffset, SeekOrigin.Begin);
+                fs.Seek(updateOffset + versionOffset, SeekOrigin.Begin);
                 // Read version string
                 byte[] version = new byte[4];
                 fs.Read(version, 0, version.Length);
