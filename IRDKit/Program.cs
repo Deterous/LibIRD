@@ -944,13 +944,8 @@ namespace IRDKit
             uint crc32UInt = BitConverter.ToUInt32(crc32, 0);
 
             // Search for ISO on redump.org
-#if !NETFRAMEWORK
-            RedumpHttpClient redump = new();
+            RedumpClient redump = new();
             List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32String).ConfigureAwait(false).GetAwaiter().GetResult();
-#else
-            RedumpWebClient redump = new();
-            List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32String);
-#endif
             int id;
             if (ids.Count == 0)
             {
@@ -963,11 +958,7 @@ namespace IRDKit
                 string sha1String = HashTool.GetFileHash(isoPath, HashType.SHA1);
 
                 // Search redump.org for SHA1 hash
-#if !NETFRAMEWORK
                 List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1String).ConfigureAwait(false).GetAwaiter().GetResult();
-#else
-                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1String);
-#endif
                 if (ids2.Count == 0)
                 {
                     Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
@@ -987,12 +978,8 @@ namespace IRDKit
             }
 
             // Download key file from redump.org
-#if !NETFRAMEWORK
-            byte[] key = redump.GetByteArrayAsync($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
-#else
-            byte[] key = redump.DownloadData($"http://redump.org/disc/{id}/key");
-#endif
-            if (key.Length != 16)
+            byte[]? key = redump.DownloadData($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
+            if (key == null || key.Length != 16)
             {
                 Console.Error.WriteLine("Invalid key obtained from redump and no valid key provided, cannot create IRD");
                 return null;
