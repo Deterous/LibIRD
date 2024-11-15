@@ -978,7 +978,7 @@ namespace IRDKit
             }
 
             // Download key file from redump.org
-            byte[]? key = redump.DownloadData($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
+            byte[] key = redump.DownloadData($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
             if (key == null || key.Length != 16)
             {
                 Console.Error.WriteLine("Invalid key obtained from redump and no valid key provided, cannot create IRD");

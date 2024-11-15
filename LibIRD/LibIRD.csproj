@@ -9,7 +9,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>0.9.1</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
-    
+
+    <!-- Avoid inexact read with 'System.IO.Stream.Read' -->
+    <NoWarn>CA2022</NoWarn>
+
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
@@ -32,6 +35,11 @@
 
   <ItemGroup>
     <None Include="./README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <!-- Support for old .NET versions -->
+  <ItemGroup Condition="$(TargetFramework.StartsWith(`net2`))">
+      <PackageReference Include="Net30.LinqBridge" Version="1.3.0" />
   </ItemGroup>
 
   <ItemGroup>
