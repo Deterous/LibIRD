@@ -1663,16 +1663,16 @@ namespace LibIRD
                 for (int i = 0; i < RegionCount - 1; i++)
                 {
                     if (RegionHashes[i] == null)
-                        printText.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
                     else
-                        printText.Append($"\"{ByteArrayToHexString(RegionHashes[i])}\", ");
+                        json.Append($"\"{ByteArrayToHexString(RegionHashes[i])}\", ");
                 }
                 if (RegionCount > 0)
                 {
                     if (RegionHashes[RegionCount - 1] == null)
-                        printText.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
                     else
-                        printText.Append($"\"{ByteArrayToHexString(RegionHashes[RegionCount - 1])}\"");
+                        json.Append($"\"{ByteArrayToHexString(RegionHashes[RegionCount - 1])}\"");
                 }
                 json.AppendLine(" ],");
             }
@@ -1683,19 +1683,19 @@ namespace LibIRD
                 json.Append($"  \"Files\": [ ");
                 for (int i = 0; i < RegionCount - 1; i++)
                 {
-                    json.Append($"  \"{ByteArrayToHexString(FileKeys[i])}\" : ");
+                    json.Append($"  \"{FileKeys[i]}\" : ");
                     if (RegionHashes[i] == null)
-                        printText.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
                     else
-                        printText.Append($"\"{ByteArrayToHexString(FileHashes[i])}\", ");
+                        json.Append($"\"{ByteArrayToHexString(FileHashes[i])}\", ");
                 }
                 if (FileCount > 0)
                 {
-                    json.Append($"  \"{ByteArrayToHexString(FileKeys[FileCount - 1])}\" : ");
+                    json.Append($"  \"{FileKeys[FileCount - 1]}\" : ");
                     if (FileHashes[FileCount - 1] == null)
-                        printText.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
                     else
-                        printText.Append($"\"{ByteArrayToHexString(FileHashes[FileCount - 1])}\"");
+                        json.Append($"\"{ByteArrayToHexString(FileHashes[FileCount - 1])}\"");
                 }
                 json.AppendLine(" ],");
             }
