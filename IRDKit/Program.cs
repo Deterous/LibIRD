@@ -56,11 +56,11 @@ namespace IRDKit
             [Value(0, Required = true, HelpText = "Path to IRD/ISO file(s), or directory of IRD/ISO files")]
             public IEnumerable<string> InPath { get; set; }
 
-            [Option('a', "all", HelpText = "Print the entire contents of the IRD")]
-            public string All { get; set; }
-
             [Option('o', "output", HelpText = "Path to the text or json file to be created (will overwrite)")]
             public string OutPath { get; set; }
+
+            [Option('a', "all", HelpText = "Print the entire contents of the IRD")]
+            public bool All { get; set; }
 
             [Option('j', "json", HelpText = "Print IRD or ISO information as a JSON object")]
             public bool Json { get; set; }
