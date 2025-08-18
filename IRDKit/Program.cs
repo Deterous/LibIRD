@@ -469,7 +469,7 @@ namespace IRDKit
         /// <param name="json">Whether to format output as JSON (true) or plain text (false)</param>
         /// <param name="single">Whether to print a single JSON object or not</param>
         /// <param name="outPath">File to output info to</param>
-        public static void PrintInfo(string inPath, bool json, bool single = true, string outPath = null, bool printAll)
+        public static void PrintInfo(string inPath, bool json, bool single = true, string outPath = null, bool printAll = false)
         {
             // Check if file is an ISO
             bool isISO = String.Compare(Path.GetExtension(inPath), ".iso", StringComparison.OrdinalIgnoreCase) == 0;
