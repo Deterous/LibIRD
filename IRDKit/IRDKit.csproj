@@ -5,18 +5,21 @@
     <OutputType>Exe</OutputType>
     <TargetName>irdkit</TargetName>
     <AssemblyName>irdkit</AssemblyName>
-	<TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
+	  <TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <LangVersion>latest</LangVersion>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.9.3</Version>
+    <Version>0.9.5</Version>
     
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
-    <Copyright>Copyright (c) Deterous 2023-2024</Copyright>
+    <Copyright>Copyright (c) Deterous 2023-2025</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Deterous/LibIRD</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -30,8 +33,8 @@
 
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <PackageReference Include="SabreTools.Hashing" Version="1.4.0" />
-    <PackageReference Include="SabreTools.RedumpLib" Version="1.5.2" />
+    <PackageReference Include="SabreTools.Hashing" Version="1.5.0" />
+    <PackageReference Include="SabreTools.RedumpLib" Version="1.7.0" />
   </ItemGroup>
 
   <ItemGroup>
