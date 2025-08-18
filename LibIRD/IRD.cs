@@ -1583,8 +1583,8 @@ namespace LibIRD
             printText.AppendLine($"App Version:  {AppVersion}");
             if (printAll)
             {
-                printText.AppendLine($"Header:       {ByteArrayToHexString(Header)}")
-                printText.AppendLine($"Footer:       {ByteArrayToHexString(Footer)}")
+                printText.AppendLine($"Header:       {ByteArrayToHexString(Header)}");
+                printText.AppendLine($"Footer:       {ByteArrayToHexString(Footer)}");
             }
             printText.AppendLine($"Regions:      {RegionCount}");
             if (printAll)
@@ -1683,7 +1683,7 @@ namespace LibIRD
                 json.Append($"  \"Files\": [ ");
                 for (int i = 0; i < RegionCount - 1; i++)
                 {
-                    json.Append($"  \"{ByteArrayToHexString(FileKeys[i])}}\" : ");
+                    json.Append($"  \"{ByteArrayToHexString(FileKeys[i])}\" : ");
                     if (RegionHashes[i] == null)
                         printText.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
                     else
@@ -1691,7 +1691,7 @@ namespace LibIRD
                 }
                 if (FileCount > 0)
                 {
-                    json.Append($"  \"{ByteArrayToHexString(FileKeys[FileCount - 1])}}\" : ");
+                    json.Append($"  \"{ByteArrayToHexString(FileKeys[FileCount - 1])}\" : ");
                     if (FileHashes[FileCount - 1] == null)
                         printText.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
                     else
