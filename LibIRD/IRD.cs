@@ -1807,12 +1807,12 @@ namespace LibIRD
             using CDReader reader = new CDReader(isoHeader);
 
             // Get all file paths and their offsets
-            var files = new Dictionary<string, string>();
+            var files = new Dictionary<string, long>();
             DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
             GetFileOffsets(reader, rootDir, files);
 
             // Get all paths at each offset
-            var offsetToHash = new Dictionary<string, string>();
+            var offsetToHash = new Dictionary<long, string>();
             for (int i = 0; i < FileCount; i++)
                 offsetToHash[FileKeys[i]] = FileHashes[i];
 
@@ -1832,7 +1832,7 @@ namespace LibIRD
         /// <param name="reader">CDReader object</param>
         /// <param name="path">Path to look within</param>
         /// <param name="files">Dictionary of files and their offset</param>
-        private void GetFileOffsets(CDReader reader, DiscDirectoryInfo path, Dictionary<string, string> files)
+        private void GetFileOffsets(CDReader reader, DiscDirectoryInfo path, Dictionary<string, long> files)
         {
             foreach (DiscFileInfo fileInfo in path.GetFiles())
             {
@@ -1845,7 +1845,7 @@ namespace LibIRD
                 {
                     if (fileExtent[i] == null)
                         throw new IOException($"Unexpected file extents for {filePath}");
-                    if (fileExtent[i].Offset < smallestOffset)
+                    if (fileExtent[i].Offset < offset)
                         offset = fileExtent[i].Offset;
                 }
                 files[filePath] = offset;
