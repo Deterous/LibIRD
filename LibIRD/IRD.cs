@@ -1744,8 +1744,11 @@ namespace LibIRD
         public Dictionary<string, byte[]> GetFileHashes()
         {
             using MemoryStream headerStream = new MemoryStream(Header);
-            using GZipStream gzStream = new(headerStream, CompressionMode.Decompress);
-            using CDReader reader = new CDReader(gzStream);
+            using GZipStream gzStream = new GZipStream(headerStream, CompressionMode.Decompress);
+            using MemoryStream isoStream = new MemoryStream();
+            gzStream.CopyTo(isoStream);
+            isoStream.Position = 0;
+            using CDReader reader = new CDReader(isoStream);
 
             // Get all file paths and their offsets
             var files = new Dictionary<string, long>();
