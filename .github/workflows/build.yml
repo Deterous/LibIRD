@@ -9,6 +9,7 @@ jobs:
 
     strategy:
       matrix:
+        library: [LibIRD]
         project: [IRDKit]
         runtime: [win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
         framework: [net8.0]
@@ -41,5 +42,5 @@ jobs:
     - name: Upload nupkg
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.project }}
+        name: ${{ matrix.library }}
         path: ./artifacts/*.nupkg
