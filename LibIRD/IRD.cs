@@ -1744,7 +1744,7 @@ namespace LibIRD
         public Dictionary<string, byte[]> GetFileHashes()
         {
             using MemoryStream headerStream = new MemoryStream(Header);
-            using (GZipStream gzStream = new(headerStream, CompressionMode.Decompress))
+            using GZipStream gzStream = new(headerStream, CompressionMode.Decompress);
             using CDReader reader = new CDReader(gzStream);
 
             // Get all file paths and their offsets
