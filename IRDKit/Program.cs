@@ -852,8 +852,16 @@ namespace IRDKit
             // Check that all files and their hashes exist in the folder path
             foreach (var kvp in fileHashes)
             {
-                string base64 = Convert.ToBase64String(kvp.Value); // Converts byte[] to Base64
-                Console.WriteLine($"{kvp.Key}: {IRD.ByteArrayToHexString(kvp.Value)}");
+                filePath = Path.Combine(folderPath, kvp.Key);
+                if (!File.Exists(filePath))
+                {
+                    Console.WriteLine($"{filePath} doesn't exist");
+                }
+                var hash = HashTool.GetFileHash(filePath, HashType.MD5);
+                if (hash.SequenceEqual(kvp.Value))
+                    Console.WriteLine($"{filePath} matches");
+                else
+                    Console.WriteLine($"{filePath}: {IRD.ByteArrayToHexString(hash)}");
             }
         }
 
