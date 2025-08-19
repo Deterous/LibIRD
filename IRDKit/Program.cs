@@ -515,7 +515,7 @@ namespace IRDKit
                         }
                     }
 
-                    VerifyIRD(verifyIRDPath, folderPath);
+                    VerifyIRD(verifyIRDPath, verifyFolderPath);
 
                     break;
 
@@ -850,6 +850,11 @@ namespace IRDKit
             var fileHashes = IRD.Read(irdPath).GetFileHashes();
 
             // Check that all files and their hashes exist in the folder path
+            foreach (var kvp in fileHashes)
+            {
+                string base64 = Convert.ToBase64String(kvp.Value); // Converts byte[] to Base64
+                Console.WriteLine($"{kvp.Key}: {IRD.ByteArrayToHexString(kvp.Value)}");
+            }
         }
 
         /// <summary>
