@@ -22,9 +22,6 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
-        
-    - name: Restore dependencies
-      run: dotnet restore
       
     - name: Build
       run: dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj -f ${{ matrix.framework }} -r ${{ matrix.runtime }} -c Release -p:DebugType=None -p:DebugSymbols=false
@@ -34,3 +31,43 @@ jobs:
       with:
         name: ${{ matrix.project }}_${{ matrix.framework }}_${{ matrix.runtime }}
         path: ${{ matrix.project }}/bin/Release/${{ matrix.framework }}/${{ matrix.runtime }}/publish/*
+      
+  pack:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        project: [LibIRD]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+      with:
+        nuget-version: 'latest'
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Restore NuGet packages
+      run: nuget restore LibIRD/LibIRD.csproj
+
+    - name: Build
+      run: msbuild ${{ matrix.project }}/${{ matrix.project }}.csproj /p:Configuration=Release
+
+    - name: Pack
+      run: dotnet pack ${{ matrix.project }}/${{ matrix.project }}.csproj -c Release -o ./artifacts
+        
+    - name: Upload nupkg
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.project }}
+        path: ./artifacts/*.nupkg
