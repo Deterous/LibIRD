@@ -1561,7 +1561,9 @@ namespace LibIRD
         /// Prints IRD fields to console
         /// </summary>
         /// <param name="printPath">Optional path to save file to</param>
-        public void Print(string printPath = null, string irdName = null)
+        /// <param name="printAll">Optionally print IRD name in output header</param>
+        /// <param name="printAll">Optionally print all IRD data</param>
+        public void Print(string printPath = null, string irdName = null, bool printAll = false)
         {
             // Build string from parameters
             StringBuilder printText = new();
@@ -1579,11 +1581,38 @@ namespace LibIRD
             printText.AppendLine($"PUP Version:  {SystemVersion}");
             printText.AppendLine($"Disc Version: {DiscVersion}");
             printText.AppendLine($"App Version:  {AppVersion}");
+            if (printAll)
+            {
+                printText.AppendLine($"Header:       {ByteArrayToHexString(Header)}");
+                printText.AppendLine($"Footer:       {ByteArrayToHexString(Footer)}");
+            }
             printText.AppendLine($"Regions:      {RegionCount}");
+            if (printAll)
+            {
+                for (int i = 0; i < RegionCount; i++)
+                {
+                    printText.Append($"              Region {i} : ");
+                    if (RegionHashes[i] == null)
+                        printText.AppendLine($"{ByteArrayToHexString(NullMD5)}");
+                    else
+                        printText.AppendLine($"{ByteArrayToHexString(RegionHashes[i])}");
+                }
+            }
             printText.AppendLine($"Files:        {FileCount}");
-            if (ExtraConfig != 0x0000)
+            if (printAll)
+            {
+                for (int i = 0; i < FileCount; i++)
+                {
+                    printText.Append($"              {FileKeys[i]:X7} : ");
+                    if (FileHashes[i] == null)
+                        printText.AppendLine($"{ByteArrayToHexString(NullMD5)}");
+                    else
+                        printText.AppendLine($"{ByteArrayToHexString(FileHashes[i])}");
+                }
+            }
+            if (printAll || ExtraConfig != 0x0000)
                 printText.AppendLine($"Extra Config: {ExtraConfig:X4}");
-            if (Attachments != 0x0000)
+            if (printAll || Attachments != 0x0000)
                 printText.AppendLine($"Attachments:  {Attachments:X4}");
             printText.AppendLine($"Unique ID:    {UID:X8}");
             printText.AppendLine($"Data 1 Key:   {ByteArrayToHexString(Data1Key)}");
@@ -1610,7 +1639,9 @@ namespace LibIRD
         /// Prints IRD fields to a json object
         /// </summary>
         /// <param name="jsonPath">Optionally print to json file</param>
-        public void PrintJson(string jsonPath = null, bool single = true)
+        /// <param name="single">Optionally print single object (no trailing comma)</param>
+        /// <param name="printAll">Optionally print all IRD data</param>
+        public void PrintJson(string jsonPath = null, bool single = true, bool printAll = false)
         {
             // Build string from parameters
             StringBuilder json = new();
@@ -1624,11 +1655,58 @@ namespace LibIRD
             json.AppendLine($"  \"PUP Version\": \"{SystemVersion}\",");
             json.AppendLine($"  \"Disc Version\": \"{DiscVersion}\",");
             json.AppendLine($"  \"App Version\": \"{AppVersion}\",");
-            json.AppendLine($"  \"Regions\": \"{RegionCount}\",");
-            json.AppendLine($"  \"Files\": \"{FileCount}\",");
-            if (ExtraConfig != 0x0000)
+            if (printAll)
+            {
+                json.AppendLine($"  \"Header\": \"{ByteArrayToHexString(Header)}\",");
+                json.AppendLine($"  \"Footer\": \"{ByteArrayToHexString(Footer)}\",");
+            }
+            if (!printAll)
+                json.AppendLine($"  \"Regions\": \"{RegionCount}\",");
+            else
+            {
+                json.Append($"  \"Regions\": [ ");
+                for (int i = 0; i < RegionCount - 1; i++)
+                {
+                    if (RegionHashes[i] == null)
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
+                    else
+                        json.Append($"\"{ByteArrayToHexString(RegionHashes[i])}\", ");
+                }
+                if (RegionCount > 0)
+                {
+                    if (RegionHashes[RegionCount - 1] == null)
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
+                    else
+                        json.Append($"\"{ByteArrayToHexString(RegionHashes[RegionCount - 1])}\"");
+                }
+                json.AppendLine(" ],");
+            }
+            if(!printAll)
+                json.AppendLine($"  \"Files\": \"{FileCount}\",");
+            else
+            {
+                json.Append($"  \"Files\": [ ");
+                for (int i = 0; i < RegionCount - 1; i++)
+                {
+                    json.Append($"  \"{FileKeys[i]}\" : ");
+                    if (RegionHashes[i] == null)
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
+                    else
+                        json.Append($"\"{ByteArrayToHexString(FileHashes[i])}\", ");
+                }
+                if (FileCount > 0)
+                {
+                    json.Append($"  \"{FileKeys[FileCount - 1]}\" : ");
+                    if (FileHashes[FileCount - 1] == null)
+                        json.Append($"\"{ByteArrayToHexString(NullMD5)}\"");
+                    else
+                        json.Append($"\"{ByteArrayToHexString(FileHashes[FileCount - 1])}\"");
+                }
+                json.AppendLine(" ],");
+            }
+            if (printAll || ExtraConfig != 0x0000)
                 json.AppendLine($"  \"Extra Config\": \"{ExtraConfig:X4}\",");
-            if (Attachments != 0x0000)
+            if (printAll || Attachments != 0x0000)
                 json.AppendLine($"  \"Attachments\": \"{Attachments:X4}\",");
             json.AppendLine($"  \"Unique ID\": \"{UID:X8}\",");
             json.AppendLine($"  \"Data 1 Key\": \"{ByteArrayToHexString(Data1Key)}\",");

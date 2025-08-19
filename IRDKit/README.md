@@ -32,6 +32,7 @@ For all options, run `irdkit help info`
 To print info about an ISO or IRD file, run `irdkit info game.iso` or `irdkit info game.ird`
 The info can be printed to a file, e.g. `-o out.txt` or `--output=`
 The info can be formatted as a JSON with `-j` or `--json`
+To print all info in the IRD use `-a` or `--all`
 
 ## Comparing IRDs
 

@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.9.3</Version>
+    <Version>0.9.4</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
 
     <!-- Avoid inexact read with 'System.IO.Stream.Read' -->
@@ -16,7 +16,7 @@
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
-    <Copyright>Copyright (c) Deterous 2023-2024</Copyright>
+    <Copyright>Copyright (c) Deterous 2023-2025</Copyright>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/Deterous/LibIRD/</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

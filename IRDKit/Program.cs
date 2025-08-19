@@ -59,6 +59,9 @@ namespace IRDKit
             [Option('o', "output", HelpText = "Path to the text or json file to be created (will overwrite)")]
             public string OutPath { get; set; }
 
+            [Option('a', "all", HelpText = "Print the entire contents of the IRD")]
+            public bool All { get; set; }
+
             [Option('j', "json", HelpText = "Print IRD or ISO information as a JSON object")]
             public bool Json { get; set; }
 
@@ -283,7 +286,7 @@ namespace IRDKit
                             string lastIRD = irdFiles.Last();
                             foreach (string file in irdFiles)
                             {
-                                PrintInfo(file, opt.Json, (noISO && file.Equals(lastIRD)), opt.OutPath);
+                                PrintInfo(file, opt.Json, (noISO && file.Equals(lastIRD)), opt.OutPath, opt.All);
                             }
 
 
@@ -325,7 +328,7 @@ namespace IRDKit
                             }
 
                             // Print info from given file
-                            PrintInfo(filePath, opt.Json, true, opt.OutPath);
+                            PrintInfo(filePath, opt.Json, true, opt.OutPath, opt.All);
 
                             if (opt.OutPath != null && opt.OutPath != "")
                                 Console.WriteLine($"Info saved to {opt.OutPath}");
@@ -464,8 +467,9 @@ namespace IRDKit
         /// </summary>
         /// <param name="inPath">File to retrieve info from</param>
         /// <param name="json">Whether to format output as JSON (true) or plain text (false)</param>
+        /// <param name="single">Whether to print a single JSON object or not</param>
         /// <param name="outPath">File to output info to</param>
-        public static void PrintInfo(string inPath, bool json, bool single = true, string outPath = null)
+        public static void PrintInfo(string inPath, bool json, bool single = true, string outPath = null, bool printAll = false)
         {
             // Check if file is an ISO
             bool isISO = String.Compare(Path.GetExtension(inPath), ".iso", StringComparison.OrdinalIgnoreCase) == 0;
@@ -492,10 +496,10 @@ namespace IRDKit
                         File.AppendAllText(outPath, $"\"{Path.GetFileName(inPath)}\": ");
                     else
                         Console.Write($"\"{Path.GetFileName(inPath)}\": ");
-                    ird.PrintJson(outPath, single);
+                    ird.PrintJson(outPath, single, printAll);
                 }
                 else
-                    IRD.Read(inPath).Print(outPath, Path.GetFileName(inPath));
+                    IRD.Read(inPath).Print(outPath, Path.GetFileName(inPath), printAll);
 
                 if (json)
                     return;
@@ -518,6 +522,7 @@ namespace IRDKit
         /// </summary>
         /// <param name="isoPath">Path to ISO file</param>
         /// <param name="json">Whether to format output as JSON (true) or plain text (false)</param>
+        /// <param name="single">Whether to print a single JSON object or not</param>
         /// <param name="outPath">File to output info to</param>
         /// <exception cref="FileNotFoundException"></exception>
         /// <exception cref="InvalidFileSystemException"></exception>
