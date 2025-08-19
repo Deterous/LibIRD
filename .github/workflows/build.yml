@@ -28,9 +28,18 @@ jobs:
       
     - name: Build
       run: dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj -f ${{ matrix.framework }} -r ${{ matrix.runtime }} -c Release -p:DebugType=None -p:DebugSymbols=false
+      
+    - name: Pack
+      run: dotnet pack ${{ matrix.project }}/${{ matrix.project }}.csproj -c Release --no-build --output ./artifacts
         
     - name: Upload build
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.project }}_${{ matrix.framework }}_${{ matrix.runtime }}
         path: ${{ matrix.project }}/bin/Release/${{ matrix.framework }}/${{ matrix.runtime }}/publish/*
+        
+    - name: Upload nupkg
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.project }}
+        path: ./artifacts/*.nupkg
