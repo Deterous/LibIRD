@@ -1743,8 +1743,9 @@ namespace LibIRD
         /// <param name="cd">CDReader object</param>
         public Dictionary<string, byte[]> GetFileHashes()
         {
-            using MemoryStream isoHeader = new MemoryStream(Header);
-            using CDReader reader = new CDReader(isoHeader);
+            using MemoryStream headerStream = new MemoryStream(Header);
+            using (GZipStream gzStream = new(headerStream, CompressionMode.Decompress))
+            using CDReader reader = new CDReader(gzStream);
 
             // Get all file paths and their offsets
             var files = new Dictionary<string, long>();
