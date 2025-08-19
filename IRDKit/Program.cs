@@ -859,9 +859,7 @@ namespace IRDKit
                     continue;
                 }
                 var hash = HashTool.GetFileHashArray(filePath, HashType.MD5);
-                if (hash.SequenceEqual(kvp.Value))
-                    Console.WriteLine($"{filePath} matches");
-                else
+                if (!hash.SequenceEqual(kvp.Value))
                     Console.WriteLine($"{filePath}: {IRD.ByteArrayToHexString(hash)}");
             }
         }
