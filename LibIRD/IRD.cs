@@ -1794,5 +1794,68 @@ namespace LibIRD
         }
 
         #endregion
+
+        #region IRD Validation
+
+        /// <summary>
+        /// Returns dictionary of file paths and their offset
+        /// </summary>
+        /// <param name="cd">CDReader object</param>
+        public Dictionary<string, string> GetFileHashes()
+        {
+            using MemoryStream isoHeader = new MemoryStream(Header);
+            using CDReader reader = new CDReader(isoHeader);
+
+            // Get all file paths and their offsets
+            var files = new Dictionary<string, string>();
+            DiscDirectoryInfo rootDir = reader.GetDirectoryInfo("\\");
+            GetFileOffsets(reader, rootDir, files);
+
+            // Get all paths at each offset
+            var offsetToHash = new Dictionary<string, string>();
+            for (int i = 0; i < FileCount; i++)
+                offsetToHash[FileKeys[i]] = FileHashes[i];
+
+            // Return dictionary of paths and hashes
+            var result = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> kvp in files)
+            {
+                if (offsetToHash.ContainsKey(kvp.Value))
+                    result[kvp.Key] = offsetToHash[kvp.Value];
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Gets all file paths from the ISO header
+        /// </summary>
+        /// <param name="reader">CDReader object</param>
+        /// <param name="path">Path to look within</param>
+        /// <param name="files">Dictionary of files and their offset</param>
+        private void GetFileOffsets(CDReader reader, DiscDirectoryInfo path, Dictionary<string, string> files)
+        {
+            foreach (DiscFileInfo fileInfo in path.GetFiles())
+            {
+                string filePath = fileInfo.FullName;
+                Range<long, long>[] fileExtent = reader.PathToClusters(filePath);
+                if (fileExtent == null && fileExtent.Length == 0)
+                    throw new IOException($"Unexpected file extents for {filePath}");
+                long offset = fileExtent[0].Offset;
+                for (int i = 1; i < fileExtent.Length; i++)
+                {
+                    if (fileExtent[i] == null)
+                        throw new IOException($"Unexpected file extents for {filePath}");
+                    if (fileExtent[i].Offset < smallestOffset)
+                        offset = fileExtent[i].Offset;
+                }
+                files[filePath] = offset;
+            }
+            foreach (DiscDirectoryInfo dirInfo in path.GetDirectories())
+            {
+                GetFileOffsets(reader, dirInfo, files);
+            }
+        }
+
+        #endregion
     }
 }

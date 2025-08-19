@@ -113,6 +113,19 @@ namespace IRDKit
             public bool Verbose { get; set; }
         }
 
+        /// <summary>
+        /// IRD verify command
+        /// </summary>
+        [Verb("verify", HelpText = "Verify a folder using an IRD")]
+        public class VerifyOptions
+        {
+            [Value(0, Required = true, HelpText = "Path to IRD file to use for validation")]
+            public IEnumerable<string> IRDPath { get; set; }
+            
+            [Value(1, Required = true, HelpText = "Folder path to validate")]
+            public IEnumerable<string> FolderPath { get; set; }
+        }
+
         #endregion
 
         #region Program
@@ -452,6 +465,60 @@ namespace IRDKit
 
                     break;
 
+                // Process options from a 'rename' command
+                case VerifyOptions opt:
+
+                    string irdPath = opt.IRDPath;
+                    string folderPath = opt.FolderPath;
+
+                    // Validate required parameters
+                    if (string.IsNullOrEmpty(irdPath))
+                    {
+                        Console.Error.WriteLine("Provide a IRD path to verify with");
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(folderPath))
+                    {
+                        Console.Error.WriteLine("Provide a folder path to verify");
+                        return;
+                    }
+
+                    bool switched = false;
+                    if (!File.Exists(irdPath))
+                    {
+                        // Check if arguments are switched
+                        if (File.Exists(folderPath))
+                        {
+                            switched = true;
+                            string temp = irdPath;
+                            irdPath = folderPath;
+                            folderPath = temp;
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine("Provide a valid IRD file to verify with");
+                            return;
+                        }
+                    }
+
+                    if (!Directory.Exists(folderPath))
+                    {
+                        if (switched)
+                        {
+                            Console.Error.WriteLine("Provide a valid IRD file to verify with");
+                            return;
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine("Provide a valid folder path to verify");
+                            return;
+                        }
+                    }
+
+                    VerifyIRD(irdPath, folderPath);
+
+                    break;
+
                 // Unknown command
                 default:
                     break;
@@ -770,6 +837,19 @@ namespace IRDKit
                 File.AppendAllText(outPath, printText.ToString());
             else
                 Console.WriteLine(printText.ToString());
+        }
+
+        /// <summary>
+        /// Verify a folder matches against an IRD
+        /// </summary>
+        /// <param name="irdPath">IRD path to verify with</param>
+        /// <param name="folderPath">Folder containing files to verify against</param>
+        public static void VerifyIRD(string irdPath, string folderPath)
+        {
+            // Get file paths and their hashes to verify with
+            var fileHashes = IRD.Read(irdPath).GetFileHashes();
+
+            // Check that all files and their hashes exist in the folder path
         }
 
         /// <summary>
