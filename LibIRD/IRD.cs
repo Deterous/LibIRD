@@ -1801,7 +1801,7 @@ namespace LibIRD
         /// Returns dictionary of file paths and their offset
         /// </summary>
         /// <param name="cd">CDReader object</param>
-        public Dictionary<string, string> GetFileHashes()
+        public Dictionary<string, byte[]> GetFileHashes()
         {
             using MemoryStream isoHeader = new MemoryStream(Header);
             using CDReader reader = new CDReader(isoHeader);
@@ -1812,13 +1812,13 @@ namespace LibIRD
             GetFileOffsets(reader, rootDir, files);
 
             // Get all paths at each offset
-            var offsetToHash = new Dictionary<long, string>();
+            var offsetToHash = new Dictionary<long, byte[]>();
             for (int i = 0; i < FileCount; i++)
                 offsetToHash[FileKeys[i]] = FileHashes[i];
 
             // Return dictionary of paths and hashes
-            var result = new Dictionary<string, string>();
-            foreach (KeyValuePair<string, string> kvp in files)
+            var result = new Dictionary<string, byte[]>();
+            foreach (KeyValuePair<string, long> kvp in files)
             {
                 if (offsetToHash.ContainsKey(kvp.Value))
                     result[kvp.Key] = offsetToHash[kvp.Value];
