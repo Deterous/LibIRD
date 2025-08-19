@@ -1,0 +1,34 @@
+name: Pack
+
+on:
+  push: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project: [LibIRD]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Pack
+      run: dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj -c Release --output ./artifacts
+        
+    - name: Upload nupkg
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.project }}
+        path: ./artifacts/*.nupkg
