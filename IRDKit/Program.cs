@@ -862,6 +862,7 @@ namespace IRDKit
                 if (!hash.SequenceEqual(kvp.Value))
                     Console.WriteLine($"{filePath}: {IRD.ByteArrayToHexString(hash)}");
             }
+            Console.WriteLine("Verification complete!");
         }
 
         /// <summary>
