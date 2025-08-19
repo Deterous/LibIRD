@@ -120,10 +120,10 @@ namespace IRDKit
         public class VerifyOptions
         {
             [Value(0, Required = true, HelpText = "Path to IRD file to use for validation")]
-            public IEnumerable<string> IRDPath { get; set; }
+            public string IRDPath { get; set; }
             
             [Value(1, Required = true, HelpText = "Folder path to validate")]
-            public IEnumerable<string> FolderPath { get; set; }
+            public string FolderPath { get; set; }
         }
 
         #endregion
@@ -468,31 +468,31 @@ namespace IRDKit
                 // Process options from a 'rename' command
                 case VerifyOptions opt:
 
-                    string irdPath = opt.IRDPath;
-                    string folderPath = opt.FolderPath;
+                    string verifyIRDPath = opt.IRDPath;
+                    string verifyFolderPath = opt.FolderPath;
 
                     // Validate required parameters
-                    if (string.IsNullOrEmpty(irdPath))
+                    if (string.IsNullOrEmpty(verifyIRDPath))
                     {
                         Console.Error.WriteLine("Provide a IRD path to verify with");
                         return;
                     }
-                    if (string.IsNullOrEmpty(folderPath))
+                    if (string.IsNullOrEmpty(verifyFolderPath))
                     {
                         Console.Error.WriteLine("Provide a folder path to verify");
                         return;
                     }
 
                     bool switched = false;
-                    if (!File.Exists(irdPath))
+                    if (!File.Exists(verifyIRDPath))
                     {
                         // Check if arguments are switched
-                        if (File.Exists(folderPath))
+                        if (File.Exists(verifyFolderPath))
                         {
                             switched = true;
-                            string temp = irdPath;
-                            irdPath = folderPath;
-                            folderPath = temp;
+                            string temp = verifyIRDPath;
+                            verifyIRDPath = verifyFolderPath;
+                            verifyFolderPath = temp;
                         }
                         else
                         {
@@ -501,7 +501,7 @@ namespace IRDKit
                         }
                     }
 
-                    if (!Directory.Exists(folderPath))
+                    if (!Directory.Exists(verifyFolderPath))
                     {
                         if (switched)
                         {
@@ -515,7 +515,7 @@ namespace IRDKit
                         }
                     }
 
-                    VerifyIRD(irdPath, folderPath);
+                    VerifyIRD(verifyIRDPath, folderPath);
 
                     break;
 
