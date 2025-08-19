@@ -1593,9 +1593,9 @@ namespace LibIRD
                 {
                     printText.Append($"              Region {i} : ");
                     if (RegionHashes[i] == null)
-                        printText.Append($"{ByteArrayToHexString(NullMD5)}");
+                        printText.AppendLine($"{ByteArrayToHexString(NullMD5)}");
                     else
-                        printText.Append($"{ByteArrayToHexString(RegionHashes[i])}");
+                        printText.AppendLine($"{ByteArrayToHexString(RegionHashes[i])}");
                 }
             }
             printText.AppendLine($"Files:        {FileCount}");
@@ -1605,9 +1605,9 @@ namespace LibIRD
                 {
                     printText.Append($"              {FileKeys[i]:X7} : ");
                     if (FileHashes[i] == null)
-                        printText.Append($"{ByteArrayToHexString(NullMD5)}");
+                        printText.AppendLine($"{ByteArrayToHexString(NullMD5)}");
                     else
-                        printText.Append($"{ByteArrayToHexString(FileHashes[i])}");
+                        printText.AppendLine($"{ByteArrayToHexString(FileHashes[i])}");
                 }
             }
             if (printAll || ExtraConfig != 0x0000)
