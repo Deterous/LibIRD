@@ -52,6 +52,9 @@ jobs:
       with:
         nuget-version: 'latest'
 
+    - name: Restore NuGet packages
+      run: nuget restore LibIRD/LibIRD.csproj
+
     - name: Build
       run: msbuild ${{ matrix.project }}/${{ matrix.project }}.csproj /p:Configuration=Release
 
