@@ -14,6 +14,7 @@ IRDKit is a tool that allows direct use of LibIRD functionality from a command l
 - Creating an IRD from an ISO: `irdkit create game.iso`
 - Finding differences between two IRDs: `irdkit diff game1.ird game2.ird`
 - Renaming an IRD or folder of IRDs using a redump DAT: `irdkit rename -d redump.dat game.ird`
+- Verify a JB Folder with an IRD: `irdkit verify game.ird folder`
 
 For detailed usage, read more [here](IRDKit).
 
