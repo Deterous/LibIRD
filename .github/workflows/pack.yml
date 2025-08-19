@@ -25,7 +25,7 @@ jobs:
       run: dotnet restore
       
     - name: Pack
-      run: dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj -c Release --output ./artifacts
+      run: dotnet pack ${{ matrix.project }}/${{ matrix.project }}.csproj -c Release --output ./artifacts
         
     - name: Upload nupkg
       uses: actions/upload-artifact@v4
