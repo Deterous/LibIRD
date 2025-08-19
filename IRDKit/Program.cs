@@ -140,7 +140,7 @@ namespace IRDKit
             Console.OutputEncoding = Encoding.UTF8;
 
             // Parse arguments
-            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions, DiffOptions, RenameOptions>(args).WithParsed(Run);
+            var result = Parser.Default.ParseArguments<CreateOptions, InfoOptions, DiffOptions, RenameOptions, VerifyOptions>(args).WithParsed(Run);
         }
 
         /// <summary>
