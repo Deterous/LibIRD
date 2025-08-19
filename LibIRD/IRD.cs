@@ -1655,6 +1655,11 @@ namespace LibIRD
             json.AppendLine($"  \"PUP Version\": \"{SystemVersion}\",");
             json.AppendLine($"  \"Disc Version\": \"{DiscVersion}\",");
             json.AppendLine($"  \"App Version\": \"{AppVersion}\",");
+            if (printAll)
+            {
+                json.AppendLine($"  \"Header\": \"{ByteArrayToHexString(Header)}\",");
+                json.AppendLine($"  \"Footer\": \"{ByteArrayToHexString(Footer)}\",");
+            }
             if (!printAll)
                 json.AppendLine($"  \"Regions\": \"{RegionCount}\",");
             else
