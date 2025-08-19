@@ -858,7 +858,7 @@ namespace IRDKit
                     Console.WriteLine($"{filePath} doesn't exist");
                     continue;
                 }
-                var hash = HashTool.GetFileHash(filePath, HashType.MD5);
+                var hash = HashTool.GetFileHashArray(filePath, HashType.MD5);
                 if (hash.SequenceEqual(kvp.Value))
                     Console.WriteLine($"{filePath} matches");
                 else
