@@ -1746,7 +1746,16 @@ namespace LibIRD
             using MemoryStream headerStream = new MemoryStream(Header);
             using GZipStream gzStream = new GZipStream(headerStream, CompressionMode.Decompress);
             using MemoryStream isoStream = new MemoryStream();
+#if NETCOREAPP || NETSTANDARD || NET40_OR_GREATER
             gzStream.CopyTo(isoStream);
+#else
+            byte[] buffer = new byte[SectorSize];
+            int bytesRead;
+            while ((bytesRead = gzStream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                isoStream.Write(buffer, 0, bytesRead);
+            }
+#endif
             isoStream.Position = 0;
             using CDReader reader = new CDReader(isoStream);
 
