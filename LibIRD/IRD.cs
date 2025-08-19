@@ -1159,7 +1159,9 @@ namespace LibIRD
                     // If making redump-style IRD, save CRC32 hash to UID field
                     if (redump)
                     {
+                        isoHasher.Terminate();
                         crc32 = isoHasher.CurrentHashBytes;
+                        isoHasher.Dispose();
                         Array.Reverse(crc32);
                         UID = BitConverter.ToUInt32(crc32, 0);
                     }
