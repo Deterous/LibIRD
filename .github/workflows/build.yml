@@ -49,11 +49,8 @@ jobs:
       with:
         nuget-version: 'latest'
 
-    - name: Restore
-      run: nuget restore ${{ matrix.project }}/${{ matrix.project }}.sln
-
     - name: Build
-      run: msbuild ${{ matrix.project }}/${{ matrix.project }}.sln /p:Configuration=Release
+      run: msbuild ${{ matrix.project }}/${{ matrix.project }}.csproj /p:Configuration=Release
 
     - name: Pack
       run: nuget pack ${{ matrix.project }}/${{ matrix.project }}.csproj -Properties Configuration=Release -OutputDirectory ./artifacts
