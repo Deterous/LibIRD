@@ -852,7 +852,7 @@ namespace IRDKit
             // Check that all files and their hashes exist in the folder path
             foreach (var kvp in fileHashes)
             {
-                filePath = Path.Combine(folderPath, kvp.Key);
+                string filePath = Path.Combine(folderPath, kvp.Key);
                 if (!File.Exists(filePath))
                 {
                     Console.WriteLine($"{filePath} doesn't exist");
