@@ -46,3 +46,7 @@ The comparison can be printed to a file, e.g. `-o out.txt` or `--output=`
 For all options, run `irdkit help rename`
 
 To rename an IRD (or folder of IRDs) according to a redump DAT, run `irdkit rename -d redump.dat game.ird`
+
+## Verifying with an IRD
+
+To verify that a folder containing files from a PS3 disc match the file hashes within an IRD, run `irdkit verify game.ird folder/of/files`
