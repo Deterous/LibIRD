@@ -1162,7 +1162,6 @@ namespace LibIRD
                         isoHasher.Terminate();
                         crc32 = isoHasher.CurrentHashBytes;
                         isoHasher.Dispose();
-                        Array.Reverse(crc32);
                         UID = BitConverter.ToUInt32(crc32, 0);
                     }
 
@@ -1421,7 +1420,6 @@ namespace LibIRD
             // Calculate the little-endian 32-bit "IEEE 802.3" CRC value of the IRD contents so far
             stream.Position = 0;
             byte[] crc32 = HashTool.GetStreamHashArray(stream, HashType.CRC32, true);
-            Array.Reverse(crc32);
 
             // Write final CRC value to the stream
             stream.Write(crc32, 0, 4);
