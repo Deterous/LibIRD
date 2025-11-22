@@ -1038,7 +1038,6 @@ namespace IRDKit
             string crc32String = LibIRD.IRD.ByteArrayToHexString(crc32).ToLowerInvariant();
 
             // Convert to UInt for use as UID in IRD
-            Array.Reverse(crc32);
             uint crc32UInt = BitConverter.ToUInt32(crc32, 0);
 
             // Search for ISO on redump.org
