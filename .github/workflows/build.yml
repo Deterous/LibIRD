@@ -11,7 +11,7 @@ jobs:
       matrix:
         project: [IRDKit]
         runtime: [win-x86, win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
-        framework: [net8.0]
+        framework: [net10.0]
 
     steps:
     - uses: actions/checkout@v5
@@ -40,7 +40,7 @@ jobs:
         project: [LibIRD]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: 'true'
 
@@ -48,14 +48,14 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Setup NuGet
-      uses: NuGet/setup-nuget@v1
+      uses: NuGet/setup-nuget@v2
       with:
         nuget-version: 'latest'
     
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
 
     - name: Restore NuGet packages
       run: nuget restore LibIRD/LibIRD.csproj
