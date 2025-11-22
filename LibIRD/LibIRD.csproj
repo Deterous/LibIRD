@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
 
     <!-- Avoid inexact read with 'System.IO.Stream.Read' -->
@@ -36,7 +36,7 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="SabreTools.Hashing" Version="1.5.0" />
+    <PackageReference Include="SabreTools.Hashing" Version="1.6.0" />
   </ItemGroup>
 
 </Project>
