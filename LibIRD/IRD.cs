@@ -1686,7 +1686,7 @@ namespace LibIRD
             else
             {
                 json.Append($"  \"Files\": [ ");
-                for (int i = 0; i < RegionCount - 1; i++)
+                for (int i = 0; i < FileCount - 1; i++)
                 {
                     json.Append($"  \"{FileKeys[i]}\" : ");
                     if (RegionHashes[i] == null)
