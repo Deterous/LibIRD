@@ -10,6 +10,9 @@
     <Version>1.0.2</Version>
     <PackageOutputPath>../nupkg</PackageOutputPath>
 
+    <!-- Avoid inexact read with 'System.IO.Stream.Read' -->
+    <NoWarn>CA2022</NoWarn>
+
     <!-- Package Properties -->
     <Authors>Deterous</Authors>
     <Description>Library for ISO Rebuild Data</Description>
