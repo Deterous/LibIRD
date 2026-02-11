@@ -1689,7 +1689,7 @@ namespace LibIRD
                 for (int i = 0; i < FileCount - 1; i++)
                 {
                     json.Append($"  \"{FileKeys[i]}\" : ");
-                    if (RegionHashes[i] == null)
+                    if (FileHashes[i] == null)
                         json.Append($"\"{ByteArrayToHexString(NullMD5)}\", ");
                     else
                         json.Append($"\"{ByteArrayToHexString(FileHashes[i])}\", ");
