@@ -41,6 +41,9 @@ namespace LibIRD
         EasternEurope = 0x0A, // e.g. Russian + Polish language release
         Russia = EasternEurope,
         // Poland is Region.Europe
+
+        // Late reprints (2020s), USA/NTSC discs made in Sony DADC Austria
+        LateReprints = 0x0E,
     }
 
     #endregion
