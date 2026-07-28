@@ -8,7 +8,6 @@ using System.Xml.Linq;
 using CommandLine;
 using LibIRD;
 using SabreTools.Hashing;
-using SabreTools.RedumpLib.Web;
 
 namespace IRDKit
 {
@@ -162,13 +161,30 @@ namespace IRDKit
                         return;
                     }
 
+                    // Determine if multiple inputs are being processed
+                    bool multipleInputs = opt.ISOPath.Count() > 1 || opt.ISOPath.Any(p => Directory.Exists(p));
+
+                    // Warn if key options are provided with a directory
+                    if (multipleInputs)
+                    {
+                        if (opt.Key != null)
+                            Console.Error.WriteLine("Warning: -k is ignored when multiple ISOs are provided, keys will be detected automatically");
+                        if (opt.KeyFile != null && !Directory.Exists(opt.KeyFile))
+                            Console.Error.WriteLine("Warning: -f is ignored when multiple ISOs are provided unless it points to a folder of .key files");
+                        if (opt.GetKeyLog != null)
+                            Console.Error.WriteLine("Warning: -l is ignored when multiple ISOs are provided, keys will be detected automatically");
+                        if (opt.Layerbreak != null)
+                            Console.Error.WriteLine("Warning: -b is ignored when multiple ISOs are provided");
+                    }
+                    string keyFolder = (opt.KeyFile != null && Directory.Exists(opt.KeyFile)) ? opt.KeyFile : null;
+
                     foreach (string isoPath in opt.ISOPath)
                     {
                         // Validate ISO path
                         if (string.IsNullOrEmpty(isoPath))
                             continue;
 
-                        // If directory, search for all ISOs in current directory
+                        // If directory, search for all ISOs
                         if (Directory.Exists(isoPath))
                         {
                             // If recurse option enabled, search recursively
@@ -202,12 +218,16 @@ namespace IRDKit
 
                             // Determine output IRD folder
                             string outputPath = opt.IRDPath;
-                            if (File.Exists(opt.IRDPath))
+                            if (opt.IRDPath != null && !Directory.Exists(opt.IRDPath))
                                 outputPath = Path.GetDirectoryName(opt.IRDPath);
 
                             // Create an IRD file for all ISO files found
                             foreach (string file in isoFiles.OrderBy(x => x))
-                                ISO2IRD(file, irdPath: outputPath, keyPath: opt.KeyFile, verbose: opt.Verbose);
+                            {
+                                string irdResult = ISO2IRD(file, irdPath: outputPath, keyPath: keyFolder, verbose: opt.Verbose);
+                                if (irdResult != null)
+                                    Console.WriteLine($"IRD saved to {irdResult}");
+                            }
                         }
                         else
                         {
@@ -220,11 +240,11 @@ namespace IRDKit
 
                             string irdPath;
                             // Save to given output path and filename, if only 1 IRD is being created
-                            if (opt.ISOPath.Count() == 1)
+                            if (!multipleInputs)
                                 irdPath = ISO2IRD(isoPath, irdPath: opt.IRDPath, hexKey: opt.Key, keyPath: opt.KeyFile, getKeyLog: opt.GetKeyLog, layerbreak: opt.Layerbreak, verbose: opt.Verbose);
                             // Save to given output path, if more than 1 IRD is being created
                             else
-                                irdPath = ISO2IRD(isoPath, irdPath: Path.GetDirectoryName(opt.IRDPath), verbose: opt.Verbose);
+                                irdPath = ISO2IRD(isoPath, irdPath: Path.GetDirectoryName(opt.IRDPath), keyPath: keyFolder, verbose: opt.Verbose);
 
                             if (irdPath != null)
                                 Console.WriteLine($"IRD saved to {irdPath}");
@@ -832,9 +852,9 @@ namespace IRDKit
 
             // Write formatted string to file if output path provided, otherwise to console
             if (outPath != null)
-                File.AppendAllText(outPath, printText.ToString());
+                File.AppendAllText(outPath, printText.Length > 0 ? printText.ToString() : "No differences found\n");
             else
-                Console.WriteLine(printText.ToString());
+                Console.WriteLine(printText.Length > 0 ? printText.ToString() : "No differences found");
         }
 
         /// <summary>
@@ -851,7 +871,7 @@ namespace IRDKit
             bool verified = true;
             foreach (var kvp in fileHashes)
             {
-                string filePath = Path.Combine(folderPath, kvp.Key);
+                string filePath = Path.Combine(folderPath, kvp.Key.TrimStart('\\', '/'));
                 if (!File.Exists(filePath))
                 {
                     Console.WriteLine($"{filePath} doesn't exist");
@@ -995,7 +1015,7 @@ namespace IRDKit
                     // Read key from .key file
                     byte[] discKey = File.ReadAllBytes(keyfilePath);
                     if (discKey == null || discKey.Length != 16)
-                        Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                        Console.Error.WriteLine($"{keyfilePath} is not a valid key file, detecting key automatically...");
                     else
                     {
                         Console.WriteLine($"Creating {irdPath} with Key: {LibIRD.IRD.ByteArrayToHexString(discKey)}");
@@ -1035,74 +1055,9 @@ namespace IRDKit
                 }
             }
 
-            // No key provided, try get key from redump.org
-            if (verbose)
-                Console.WriteLine("No key provided... Searching for key on redump.org");
-
-            // Compute CRC32 hash
-            byte[] crc32 = HashTool.GetFileHashArray(isoPath, HashType.CRC32);
-            string crc32String = LibIRD.IRD.ByteArrayToHexString(crc32).ToLowerInvariant();
-
-            // Convert to UInt for use as UID in IRD
-            uint crc32UInt = BitConverter.ToUInt32(crc32, 0);
-
-            // Search for ISO on redump.org
-            RedumpClient redump = new();
-            List<int> ids = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + crc32String).ConfigureAwait(false).GetAwaiter().GetResult();
-            int id;
-            if (ids.Count == 0)
-            {
-                Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
-                return null;
-            }
-            else if (ids.Count > 1)
-            {
-                // More than one result for the CRC32 hash, compute SHA1 hash instead
-                string sha1String = HashTool.GetFileHash(isoPath, HashType.SHA1);
-
-                // Search redump.org for SHA1 hash
-                List<int> ids2 = redump.CheckSingleSitePage("http://redump.org/discs/system/ps3/quicksearch/" + sha1String).ConfigureAwait(false).GetAwaiter().GetResult();
-                if (ids2.Count == 0)
-                {
-                    Console.Error.WriteLine("ISO not found in redump and no valid key provided, cannot create IRD");
-                    return null;
-                }
-                else if (ids2.Count > 1)
-                {
-                    Console.Error.WriteLine("Cannot automatically get key from redump. Please search redump.org and run again with -k");
-                    return null;
-                }
-                id = ids2[0];
-            }
-            else
-            {
-                // One result found, assume it is the PS3 ISO
-                id = ids[0];
-            }
-
-            // Download key file from redump.org
-            byte[] key = redump.DownloadData($"http://redump.org/disc/{id}/key").ConfigureAwait(false).GetAwaiter().GetResult();
-            if (key == null || key.Length != 16)
-            {
-                Console.Error.WriteLine("Invalid key obtained from redump and no valid key provided, cannot create IRD");
-                return null;
-            }
-
-            // Create IRD with key from redump
-            Console.WriteLine($"Creating {irdPath} with Key from redump.org: {LibIRD.IRD.ByteArrayToHexString(key)}");
-            try
-            {
-                IRD ird = new ReIRD(isoPath, key, layerbreak, crc32UInt);
-                ird.Write(irdPath);
-                if (verbose)
-                    ird.Print();
-                return irdPath;
-            }
-            catch (Exception e)
-            {
-                Console.Error.WriteLine(e.Message + ", failed to create IRD");
-                return null;
-            }
+            // No key provided, cannot create IRD
+            Console.Error.WriteLine("No key provided. Supply a key with -k, -f, or -l");
+            return null;
         }
 
         public static XDocument DatParser(string datpath = null)

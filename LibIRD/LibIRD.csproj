@@ -36,7 +36,7 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="SabreTools.Hashing" Version="[2.0.0]" />
+    <PackageReference Include="SabreTools.Hashing" Version="[2.0.0,3.0.0)" />
   </ItemGroup>
 
 </Project>
