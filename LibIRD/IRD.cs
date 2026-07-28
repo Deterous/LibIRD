@@ -607,7 +607,7 @@ namespace LibIRD
             discPIC = HexStringToByteArray(discPICStr.Substring(0, 230));
 
             // Double check for warnings in .getkey.log
-            while ((line = sr.ReadLine()) != null && line.Trim().StartsWith("WARNING") == false && line.Trim().StartsWith("SUCCESS") == false)
+            while ((line = sr.ReadLine()) != null)
             {
                 string t = line.Trim();
                 if (t.StartsWith("WARNING"))
@@ -804,7 +804,7 @@ namespace LibIRD
         {
             // Determine PUP file offset via cluster
             Range<long, long>[] updateClusters = reader.PathToClusters("\\PS3_UPDATE\\PS3UPDAT.PUP");
-            if (updateClusters == null && updateClusters.Length == 0 && updateClusters[0] == null)
+            if (updateClusters == null || updateClusters.Length == 0 || updateClusters[0] == null)
                 throw new IOException("Invalid file extents for PS3UPDAT.PUP");
 
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
@@ -971,7 +971,7 @@ namespace LibIRD
                 Range<long, long>[] fileExtent = reader.PathToClusters(filePath);
 
                 // If invalid clusters were returned, we can't hash this file
-                if (fileExtent == null && fileExtent.Length == 0)
+                if (fileExtent == null || fileExtent.Length == 0)
                     throw new IOException($"Unexpected file extents for {filePath}");
 
                 // Determine smallest file offset as first sector
@@ -1784,7 +1784,7 @@ namespace LibIRD
             {
                 string filePath = fileInfo.FullName;
                 Range<long, long>[] fileExtent = reader.PathToClusters(filePath);
-                if (fileExtent == null && fileExtent.Length == 0)
+                if (fileExtent == null || fileExtent.Length == 0)
                     throw new IOException($"Unexpected file extents for {filePath}");
                 long offset = fileExtent[0].Offset;
                 for (int i = 1; i < fileExtent.Length; i++)

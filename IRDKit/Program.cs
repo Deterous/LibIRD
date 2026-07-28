@@ -568,8 +568,6 @@ namespace IRDKit
                 else
                     IRD.Read(inPath).Print(outPath, Path.GetFileName(inPath), printAll);
 
-                if (json)
-                    return;
                 return;
             }
             catch (InvalidDataException)
@@ -850,19 +848,27 @@ namespace IRDKit
             var fileHashes = IRD.Read(irdPath).GetFileHashes();
 
             // Check that all files and their hashes exist in the folder path
+            bool verified = true;
             foreach (var kvp in fileHashes)
             {
                 string filePath = Path.Combine(folderPath, kvp.Key);
                 if (!File.Exists(filePath))
                 {
                     Console.WriteLine($"{filePath} doesn't exist");
+                    verified = false;
                     continue;
                 }
                 var hash = HashTool.GetFileHashArray(filePath, HashType.MD5);
                 if (!hash.SequenceEqual(kvp.Value))
+                {
                     Console.WriteLine($"{filePath}: {IRD.ByteArrayToHexString(hash)}");
+                    verified = false;
+                }
             }
-            Console.WriteLine("Verification complete!");
+            if (verified)
+                Console.WriteLine("Verification complete! All files match.");
+            else
+                Console.WriteLine("Verification complete! Some files failed.");
         }
 
         /// <summary>
@@ -941,7 +947,7 @@ namespace IRDKit
                     // Read key from .key file
                     byte[] discKey = File.ReadAllBytes(keyPath);
                     if (discKey == null || discKey.Length != 16)
-                        Console.Error.WriteLine($"{hexKey} is not a valid key, detecting key automatically...");
+                        Console.Error.WriteLine($"{keyPath} is not a valid key file, detecting key automatically...");
                     else
                     {
                         Console.WriteLine($"Creating {irdPath} with Key: {LibIRD.IRD.ByteArrayToHexString(discKey)}");
@@ -1137,12 +1143,7 @@ namespace IRDKit
                 filename += $" [{ird.UID:X8}]";
 
             // Rename irdPath to filename
-            string directory = Path.GetDirectoryName(Path.GetFullPath(filename));
-            string filepath;
-            if (!string.IsNullOrEmpty(directory))
-                filepath = Path.Combine(Path.GetDirectoryName(irdPath), filename + ".ird");
-            else
-                filepath = filename + ".ird";
+            string filepath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(irdPath)), filename + ".ird");
 
             // Rename IRD to new name
             if (irdPath != filepath)

@@ -85,7 +85,7 @@ namespace LibIRD
             DiscID = GenerateID(size, region);
 
             // Generate Disc PIC
-            PIC = GeneratePIC(isoPath, size, layerbreak * SectorSize);
+            PIC = GeneratePIC(isoPath, size, layerbreak.HasValue ? layerbreak * SectorSize : null);
 
             // Generate IRD fields
             GenerateIRD(isoPath, true);
