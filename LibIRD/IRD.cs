@@ -281,10 +281,10 @@ namespace LibIRD
         private long FirstDataSector { get; set; }
 
         /// <summary>
-        /// Last byte of the PS3UPDAT.PUP file
+        /// Byte offset where the footer begins (end of last file on disc)
         /// </summary>
         /// <remarks>Offset to use when reading the footer</remarks>
-        private long UpdateEnd { get; set; }
+        private long FooterStart { get; set; }
 
         /// <summary>
         /// First sector of each region
@@ -765,16 +765,17 @@ namespace LibIRD
             // Sort files by offset
             Array.Sort(FileKeys, FileExtents);
 
-            // Determine start of footer if no update file present
-            if (UpdateEnd == 0)
-            {
-                int lastFile = FileExtents.Length - 1;
-                int lastExtent = FileExtents[lastFile].Length - 1;
-                UpdateEnd = SectorSize * FileExtents[lastFile][lastExtent].Offset + FileExtents[lastFile][lastExtent].Count;
-            }
+            // Determine footer start as the true last byte across all extents of all files
+            for (int i = 0; i < FileExtents.Length; i++)
+                for (int j = 0; j < FileExtents[i].Length; j++)
+                {
+                    long extentEnd = SectorSize * FileExtents[i][j].Offset + FileExtents[i][j].Count;
+                    if (extentEnd > FooterStart)
+                        FooterStart = extentEnd;
+                }
 
             // Read and compress the ISO header
-            GetHeader(fs, reader);
+            GetHeader(fs);
 
             // Read and compress the ISO footer
             GetFooter(fs);
@@ -808,9 +809,6 @@ namespace LibIRD
 
             // PS3UPDAT.PUP file begins at first byte of dedicated cluster
             long updateOffset = SectorSize * updateClusters[0].Offset;
-            // Update file ends at the last byte of the last cluster
-            int lastExtent = updateClusters.Length - 1;
-            UpdateEnd = SectorSize * updateClusters[lastExtent].Offset + updateClusters[lastExtent].Count;
 
             // Check PUP file Magic
             fs.Seek(updateOffset, SeekOrigin.Begin);
@@ -841,16 +839,11 @@ namespace LibIRD
         /// Retreives and stores the header
         /// </summary>
         /// <param name="fs">ISO filestream</param>
-        /// <param name="reader">CDReader</param>
         /// <exception cref="IOException"></exception>
-        private void GetHeader(FileStream fs, CDReader reader)
+        private void GetHeader(FileStream fs)
         {
-            // Determine the extent of the header via cluster (Sector 0 to first data sector)
-            Range<long, long>[] sfbClusters = reader.PathToClusters("\\PS3_DISC.SFB");
-            if (sfbClusters == null && sfbClusters.Length == 0 && sfbClusters[0] == null)
-                throw new IOException("Invalid file extents for PS3_DISC.SFB");
-            // End of header is at beginning of first byte of dedicated cluster
-            FirstDataSector = sfbClusters[0].Offset;
+            // Use the first file's sector
+            FirstDataSector = FileKeys[0];
 
             // Begin a GZip stream to write header to
             using MemoryStream headerStream = new();
@@ -896,8 +889,8 @@ namespace LibIRD
             using (GZipStream gzStream = new(footerStream, CompressionMode.Compress))
 #endif
             {
-                // Start reading data from after last file (PS3UPDAT.PUP)
-                fs.Seek(UpdateEnd, SeekOrigin.Begin);
+                // Start reading data from after the last file on disc
+                fs.Seek(FooterStart, SeekOrigin.Begin);
                 byte[] buf = new byte[SectorSize];
                 int numBytes = (int)SectorSize;
 
@@ -958,7 +951,7 @@ namespace LibIRD
             RegionStart[0] = FirstDataSector;
             // Remove footer from last region
             int lastRegion = RegionEnd.Length - 1;
-            RegionEnd[lastRegion] = (UpdateEnd / SectorSize) - 1;
+            RegionEnd[lastRegion] = (FooterStart / SectorSize) - 1;
         }
 
         /// <summary>
